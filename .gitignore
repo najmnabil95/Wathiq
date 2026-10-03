@@ -1,0 +1,30 @@
+﻿# Dependencies
+**/node_modules/
+**/vendor/
+
+# Environment
+**/.env
+**/.env.backup
+**/.env.production
+
+# Build & Dist
+**/dist/
+**/build/
+**/public/hot
+**/public/storage
+
+# Laravel Storage & Cache
+**/storage/*.key
+**/storage/framework/cache/*
+**/storage/framework/sessions/*
+**/storage/framework/views/*
+**/storage/logs/*
+!**/storage/framework/.gitignore
+!**/storage/logs/.gitignore
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
