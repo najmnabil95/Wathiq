@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { documentsAPI, categoriesAPI, documentTypesAPI, settingsAPI, organizationsAPI, departmentsAPI } from '../services/api';
+import { documentsAPI, categoriesAPI, documentTypesAPI, settingsAPI, organizationsAPI, departmentsAPI, attachmentsAPI } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { ArrowRight, Save, Plus, X, Upload, FileText, AlertCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -221,7 +221,6 @@ export default function CreateDocumentPage() {
         const formData = new FormData();
         files.forEach(f => formData.append('files[]', f));
         try {
-          const { attachmentsAPI } = await import('../services/api');
           await attachmentsAPI.upload(docId, formData);
         } catch (e2) {
           toast.error('تم إنشاء الوثيقة لكن فشل رفع بعض الملفات');
