@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import {
@@ -75,6 +75,25 @@ export default function AppLayout() {
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
+
+  // Dynamic page title
+  useEffect(() => {
+    const titles = {
+      '/': 'لوحة التحكم | وثيق IT-EDMS',
+      '/documents': 'إدارة الوثائق | وثيق IT-EDMS',
+      '/documents/create': 'إنشاء وثيقة جديدة | وثيق IT-EDMS',
+      '/categories': 'تصنيفات الوثائق | وثيق IT-EDMS',
+      '/departments': 'الأقسام والفروع | وثيق IT-EDMS',
+      '/users': 'إدارة المستخدمين | وثيق IT-EDMS',
+      '/audit': 'سجل العمليات والرقابة | وثيق IT-EDMS',
+      '/settings': 'إعدادات النظام | وثيق IT-EDMS',
+    };
+    if (location.pathname.startsWith('/documents/') && location.pathname !== '/documents/create') {
+      document.title = 'تفاصيل الوثيقة | وثيق IT-EDMS';
+    } else {
+      document.title = titles[location.pathname] || 'وثيق | نظام إدارة الوثائق IT-EDMS';
+    }
+  }, [location.pathname]);
 
   // Close sidebar on mobile navigation
   useEffect(() => {

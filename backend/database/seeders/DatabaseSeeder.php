@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace Database\Seeders;
 
@@ -12,20 +12,23 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call([
+        ->call([
             // 1. Core lookup data (no dependencies)
             CoreDataSeeder::class,
 
-            // 2. RBAC
+            // 2. Department Branches & Structure
+            DepartmentBranchSeeder::class,
+
+            // 3. RBAC
             RolesPermissionsSeeder::class,
 
-            // 3. Categories & Document Types
+            // 4. Categories & Document Types
             CategoryDocumentTypeSeeder::class,
 
-            // 4. Admin Users (depends on Roles + Departments)
+            // 5. Admin Users (depends on Roles + Departments)
             AdminUserSeeder::class,
 
-            // 5. Rich IT Sample Documents & Approvals
+            // 6. Rich IT Sample Documents & Approvals
             DummyDataSeeder::class,
         ]);
     }

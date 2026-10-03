@@ -88,3 +88,6 @@ npm run dev
 - **مدير تقنية المعلومات (IT Manager)**:
   - البريد: manager@edms.local
   - كلمة المرور: Demo@123456
+- **موظف تقنية المعلومات (IT Staff)**:
+  - البريد: staff@edms.local
+  - كلمة المرور: Demo@123456

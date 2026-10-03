@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { Eye, EyeOff, LogIn, Shield, Lock, Mail, AlertCircle } from 'lucide-react';
@@ -12,6 +12,10 @@ export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '', remember_me: false });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    document.title = 'تسجيل الدخول | وثيق IT-EDMS';
+  }, []);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
