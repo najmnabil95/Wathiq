@@ -1,0 +1,44 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: it-edms:latest
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    environment:
+      - APP_NAME="IT-EDMS"
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=http://localhost:8000
+      - DB_CONNECTION=mysql
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=it_edms_db
+      - DB_USERNAME=edms_user
+      - DB_PASSWORD=edms_secret
+    volumes:
+      - edms_storage:/var/www/storage
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: it_edms_db
+      MYSQL_USER: edms_user
+      MYSQL_PASSWORD: edms_secret
+      MYSQL_ROOT_PASSWORD: root_secret_password
+    volumes:
+      - edms_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 5
+
+volumes:
+  edms_storage:
+  edms_db_data:

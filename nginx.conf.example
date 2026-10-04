@@ -1,0 +1,64 @@
+# ==============================================================================
+# IT-EDMS Production Nginx Configuration Example
+# ==============================================================================
+# Place this file or its contents in /etc/nginx/sites-available/it-edms.conf
+# and create a symlink to /etc/nginx/sites-enabled/
+# ==============================================================================
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name edms.yourdomain.com; # Replace with your actual domain
+
+    # Redirect all HTTP traffic to HTTPS (Recommended)
+    # return 301 https://$host$request_uri;
+
+    root /var/www/it-edms/backend/public;
+    index index.html index.php;
+
+    charset utf-8;
+
+    # Maximum file upload size (matches backend 20MB limit)
+    client_max_body_size 25M;
+
+    # Gzip Compression for Fast Loading
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_proxied expired no-cache no-store private auth;
+    gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml application/javascript application/json image/svg+xml;
+    gzip_disable "MSIE [1-6]\.";
+
+    # Cache static frontend assets (Vite hashed bundles)
+    location ~* \.(?:css|js|woff2?|svg|gif|png|jpe?g|ico)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    # Security Headers
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-Content-Type-Options "nosniff";
+    add_header X-XSS-Protection "1; mode=block";
+
+    # Unified Routing: API requests to Laravel, Front routes to index.html/Laravel fallback
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    # PHP-FPM Execution
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php8.2-fpm.sock; # Adjust PHP version if needed (e.g. php8.3-fpm)
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_hide_header X-Powered-By;
+    }
+
+    # Deny access to hidden files and private folders
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
