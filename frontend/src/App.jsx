@@ -9,6 +9,7 @@ import CreateDocumentPage from './pages/CreateDocumentPage';
 import CategoriesPage from './pages/CategoriesPage';
 import DepartmentsPage from './pages/DepartmentsPage';
 import UsersPage from './pages/UsersPage';
+import RolesPage from './pages/RolesPage';
 import AuditPage from './pages/AuditPage';
 import SettingsPage from './pages/SettingsPage';
 import ErrorBoundary from './components/common/ErrorBoundary';
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="categories"       element={<CategoriesPage />} />
         <Route path="departments"      element={<DepartmentsPage />} />
         <Route path="users"            element={<UsersPage />} />
+        <Route path="roles"            element={<RolesPage />} />
         <Route path="audit"            element={<AuditPage />} />
         <Route path="settings"         element={<SettingsPage />} />
       </Route>

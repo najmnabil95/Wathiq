@@ -100,9 +100,14 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
     Route::delete('/users/{id}',   [UserController::class, 'destroy']);
     Route::put   ('/users/{id}/roles', [UserController::class, 'updateRoles']);
 
-    // Roles & Permissions
-    Route::get('/roles',       [RoleController::class, 'index']);
-    Route::get('/permissions', [RoleController::class, 'permissions']);
+    // Roles & Permissions Tree
+    Route::get   ('/roles',            [RoleController::class, 'index']);
+    Route::post  ('/roles',            [RoleController::class, 'store']);
+    Route::get   ('/roles/{id}',       [RoleController::class, 'show']);
+    Route::put   ('/roles/{id}',       [RoleController::class, 'update']);
+    Route::delete('/roles/{id}',       [RoleController::class, 'destroy']);
+    Route::get   ('/permissions',      [RoleController::class, 'permissions']);
+    Route::get   ('/permissions/tree', [RoleController::class, 'tree']);
 
     // Departments
     Route::get   ('/departments',      [DepartmentController::class, 'index']);

@@ -101,10 +101,15 @@ export const usersAPI = {
   updateRoles: (id, roles) => api.put(`/users/${id}/roles`, { roles }),
 };
 
-// ─── Roles ─────────────────────────────────────────────────────
+// ─── Roles & Permissions Tree ──────────────────────────────────
 export const rolesAPI = {
-  list:        () => api.get('/roles'),
-  permissions: () => api.get('/permissions'),
+  list:            () => api.get('/roles'),
+  get:             (id) => api.get(`/roles/${id}`),
+  create:          (data) => api.post('/roles', data),
+  update:          (id, data) => api.put(`/roles/${id}`, data),
+  delete:          (id) => api.delete(`/roles/${id}`),
+  permissions:     () => api.get('/permissions'),
+  permissionsTree: () => api.get('/permissions/tree'),
 };
 
 // ─── Departments ───────────────────────────────────────────────

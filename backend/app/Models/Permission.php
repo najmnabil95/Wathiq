@@ -13,7 +13,11 @@ class Permission extends Model
         'name',
         'display_name',
         'display_name_ar',
+        'description_ar',
         'group',
+        'subgroup',
+        'risk_level',
+        'standard_ref',
     ];
 
     // ─── Relationships ────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { usersAPI, rolesAPI, departmentsAPI } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import {
@@ -185,13 +186,23 @@ export default function UsersPage() {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreate}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition shadow-lg shadow-blue-600/20"
-        >
-          <UserPlus className="w-4 h-4" />
-          إضافة مستخدم جديد
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/roles"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-sm transition"
+          >
+            <ShieldCheck className="w-4 h-4 text-blue-400" />
+            شجرة الصلاحيات ومصفوفة الأدوار
+          </Link>
+
+          <button
+            onClick={handleOpenCreate}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition shadow-lg shadow-blue-600/20"
+          >
+            <UserPlus className="w-4 h-4" />
+            إضافة مستخدم جديد
+          </button>
+        </div>
       </div>
 
       {/* ── Filters Bar ────────────────────────────────────────────── */}

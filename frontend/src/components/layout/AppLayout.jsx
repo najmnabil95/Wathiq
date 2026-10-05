@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import {
@@ -40,6 +40,12 @@ const navItems = [
     icon: Users,
     to: '/users',
     permission: 'users.view',
+  },
+  {
+    label: 'شجرة الصلاحيات والأدوار',
+    icon: ShieldCheck,
+    to: '/roles',
+    permission: null,
   },
   {
     label: 'سجل العمليات',
@@ -85,6 +91,7 @@ export default function AppLayout() {
       '/categories': 'تصنيفات الوثائق | وثيق IT-EDMS',
       '/departments': 'الأقسام والفروع | وثيق IT-EDMS',
       '/users': 'إدارة المستخدمين | وثيق IT-EDMS',
+      '/roles': 'شجرة الصلاحيات والأدوار | وثيق IT-EDMS',
       '/audit': 'سجل العمليات والرقابة | وثيق IT-EDMS',
       '/settings': 'إعدادات النظام | وثيق IT-EDMS',
     };

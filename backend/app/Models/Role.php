@@ -41,6 +41,14 @@ class Role extends Model
         $this->permissions()->syncWithoutDetaching($ids);
     }
 
+    public function syncPermissions(array $permissions): void
+    {
+        $ids = is_numeric(reset($permissions))
+            ? $permissions
+            : Permission::whereIn('name', $permissions)->pluck('id');
+        $this->permissions()->sync($ids);
+    }
+
     public function revokePermissionTo(string $permission): void
     {
         $perm = Permission::where('name', $permission)->first();
