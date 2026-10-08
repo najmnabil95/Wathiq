@@ -1,43 +1,33 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { Eye, EyeOff, LogIn, Shield, Lock, Mail, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, LogIn, Shield, Lock, Mail, AlertCircle, Fingerprint } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
-  const navigate = useNavigate();
-  const login = useAuthStore(s => s.login);
+  const navigate  = useNavigate();
+  const login     = useAuthStore(s => s.login);
   const isLoading = useAuthStore(s => s.isLoading);
 
-  const [form, setForm] = useState({ email: '', password: '', remember_me: false });
+  const [form, setForm]               = useState({ email: '', password: '', remember_me: false });
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors]           = useState({});
 
-  useEffect(() => {
-    document.title = 'تسجيل الدخول | وثيق IT-EDMS';
-  }, []);
+  useEffect(() => { document.title = 'تسجيل الدخول | وثيق IT-EDMS'; }, []);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm(f => ({ ...f, [name]: type === 'checkbox' ? checked : value }));
-    if (errors[name]) setErrors(e => ({ ...e, [name]: null }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: null }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrors({});
-
-    if (!form.email.trim()) {
-      setErrors({ email: 'البريد الإلكتروني أو اسم المستخدم مطلوب' });
-      return;
-    }
-    if (!form.password) {
-      setErrors({ password: 'كلمة المرور مطلوبة' });
-      return;
-    }
+    if (!form.email.trim()) { setErrors({ email: 'البريد الإلكتروني أو اسم المستخدم مطلوب' }); return; }
+    if (!form.password)     { setErrors({ password: 'كلمة المرور مطلوبة' }); return; }
 
     const result = await login(form.email, form.password, form.remember_me);
-
     if (result.success) {
       toast.success('مرحباً! تم تسجيل الدخول بنجاح');
       navigate('/', { replace: true });
@@ -47,43 +37,62 @@ export default function LoginPage() {
     }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+  const demoUsers = [
+    { label: 'مدير النظام',    email: 'admin@edms.local',   password: 'ChangeMe@123', color: '#60a5fa', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.25)' },
+    { label: 'مدير تقنية المعلومات', email: 'manager@edms.local', password: 'Demo@123456', color: '#c4b5fd', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.25)' },
+    { label: 'موظف الأرشيف',  email: 'staff@edms.local',   password: 'Demo@123456', color: '#6ee7b7', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' },
+  ];
 
-      {/* ── Background decorations ── */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 left-1/4 w-64 h-64 bg-violet-500/5 rounded-full blur-3xl" />
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/30 to-transparent" />
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ direction: 'rtl' }}>
+
+      {/* Background decorations */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/4 right-1/4 w-80 h-80 rounded-full"
+             style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%)', filter: 'blur(40px)' }} />
+        <div className="absolute bottom-1/4 left-1/4 w-64 h-64 rounded-full"
+             style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.05) 0%, transparent 70%)', filter: 'blur(40px)' }} />
+        <div className="absolute top-0 left-0 w-full h-px"
+             style={{ background: 'linear-gradient(90deg, transparent, rgba(59,130,246,0.4), transparent)' }} />
+        {/* Grid pattern */}
+        <div className="absolute inset-0 opacity-[0.018]"
+             style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
       </div>
 
-      {/* ── Login Card ── */}
-      <div className="w-full max-w-md animate-fade-in relative z-10">
+      {/* Login Card */}
+      <div className="w-full max-w-[400px] animate-fade-in relative z-10">
 
-        {/* Logo / Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 relative"
-               style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(139,92,246,0.2))', border: '1px solid rgba(59,130,246,0.3)' }}>
-            <Shield size={28} className="text-blue-400" />
-            <div className="absolute inset-0 rounded-2xl animate-pulse-glow" />
+        {/* Logo */}
+        <div className="text-center mb-7">
+          <div
+            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 relative animate-float"
+            style={{
+              background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(139,92,246,0.2))',
+              border: '1px solid rgba(59,130,246,0.3)',
+              boxShadow: '0 0 40px rgba(59,130,246,0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
+            }}
+          >
+            <Shield size={27} className="text-blue-400" />
           </div>
-          <h1 className="text-2xl font-black text-white mb-1">
-            IT-EDMS
-          </h1>
-          <p className="text-sm" style={{ color: '#526080' }}>
-            نظام إدارة وأرشفة وثائق تقنية المعلومات
+          <h1 className="text-[22px] font-black text-white mb-1 tracking-tight">وثيق IT-EDMS</h1>
+          <p className="text-[13px]" style={{ color: '#45607a' }}>
+            نظام إدارة وأرشفة الوثائق الإلكترونية
           </p>
         </div>
 
         {/* Card */}
-        <div className="glass p-8 shadow-2xl">
-          <h2 className="text-lg font-bold mb-6" style={{ color: '#e2e8f0' }}>
-            تسجيل الدخول
-          </h2>
+        <div
+          className="glass p-6 sm:p-8"
+          style={{ boxShadow: '0 24px 80px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06)' }}
+        >
+          <div className="flex items-center gap-2 mb-6">
+            <Fingerprint size={18} className="text-blue-400" />
+            <h2 className="text-base font-bold" style={{ color: '#d4e0f5' }}>تسجيل الدخول</h2>
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
 
-            {/* Email / Username */}
+            {/* Email */}
             <div>
               <label className="form-label">
                 البريد الإلكتروني أو اسم المستخدم
@@ -100,8 +109,9 @@ export default function LoginPage() {
                   placeholder="admin@edms.local"
                   autoComplete="username"
                   dir="ltr"
+                  style={{ paddingLeft: '40px' }}
                 />
-                <Mail size={16} className="absolute top-1/2 left-3 -translate-y-1/2" style={{ color: '#526080' }} />
+                <Mail size={15} className="absolute top-1/2 left-3 -translate-y-1/2 pointer-events-none" style={{ color: '#3d5070' }} />
               </div>
               {errors.email && (
                 <p className="form-error">
@@ -126,16 +136,18 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   autoComplete="current-password"
                   dir="ltr"
+                  style={{ paddingRight: '40px', paddingLeft: '40px' }}
                 />
-                <Lock size={16} className="absolute top-1/2 right-3 -translate-y-1/2" style={{ color: '#526080' }} />
+                <Lock size={15} className="absolute top-1/2 right-3 -translate-y-1/2 pointer-events-none" style={{ color: '#3d5070' }} />
                 <button
                   type="button"
                   onClick={() => setShowPassword(v => !v)}
-                  className="absolute top-1/2 left-3 -translate-y-1/2"
+                  className="absolute top-1/2 left-3 -translate-y-1/2 p-0.5 rounded transition-colors hover:text-blue-400"
                   style={{ color: '#526080', background: 'none', border: 'none', cursor: 'pointer' }}
                   tabIndex={-1}
+                  title={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
               {errors.password && (
@@ -146,8 +158,8 @@ export default function LoginPage() {
             </div>
 
             {/* Remember Me */}
-            <label className="flex items-center gap-3 cursor-pointer select-none">
-              <div className="relative">
+            <label className="flex items-center gap-3 cursor-pointer select-none pt-1">
+              <div className="relative flex-shrink-0">
                 <input
                   id="remember-me"
                   type="checkbox"
@@ -156,11 +168,17 @@ export default function LoginPage() {
                   onChange={handleChange}
                   className="sr-only"
                 />
-                <div className={`w-10 h-5 rounded-full transition-colors duration-200 ${form.remember_me ? 'bg-blue-500' : 'bg-white/10'}`}>
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${form.remember_me ? 'right-0.5' : 'left-0.5'}`} />
+                <div
+                  className="w-10 h-5 rounded-full transition-all duration-200"
+                  style={{ background: form.remember_me ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255,255,255,0.08)', boxShadow: form.remember_me ? '0 0 12px rgba(59,130,246,0.3)' : 'none' }}
+                >
+                  <div
+                    className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200"
+                    style={{ transform: form.remember_me ? 'translateX(-24px)' : 'translateX(-2px)', right: form.remember_me ? '-2px' : 'auto', left: form.remember_me ? 'auto' : '2px' }}
+                  />
                 </div>
               </div>
-              <span className="text-sm" style={{ color: '#8b9cc8' }}>تذكرني</span>
+              <span className="text-sm" style={{ color: '#7a90a8' }}>تذكرني</span>
             </label>
 
             {/* Submit */}
@@ -169,58 +187,51 @@ export default function LoginPage() {
               type="submit"
               disabled={isLoading}
               className="btn btn-primary w-full btn-lg mt-2"
+              style={{ height: '46px' }}
             >
               {isLoading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin-slow" />
+                  <div className="spinner" style={{ width: '17px', height: '17px' }} />
                   جاري تسجيل الدخول...
                 </>
               ) : (
                 <>
-                  <LogIn size={18} />
-                  تسجيل الدخول
+                  <LogIn size={17} />
+                  دخول إلى النظام
                 </>
               )}
             </button>
           </form>
 
           {/* Quick Demo Logins */}
-          <div className="mt-6 pt-4 border-t border-slate-800 space-y-2">
-            <p className="text-xs text-slate-400 text-center font-medium">دخول تجريبي سريع ومباشر:</p>
+          <div className="mt-5 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <p className="text-[11px] text-center font-semibold mb-2.5" style={{ color: '#364a60' }}>
+              — دخول تجريبي سريع —
+            </p>
             <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setForm({ email: 'admin@edms.local', password: 'ChangeMe@123', remember_me: true })}
-                className="px-2 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-300 text-xs font-semibold transition text-center"
-              >
-                Super Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => setForm({ email: 'manager@edms.local', password: 'Demo@123456', remember_me: true })}
-                className="px-2 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-semibold transition text-center"
-              >
-                IT Manager
-              </button>
-              <button
-                type="button"
-                onClick={() => setForm({ email: 'staff@edms.local', password: 'Demo@123456', remember_me: true })}
-                className="px-2 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition text-center"
-              >
-                Archivist
-              </button>
+              {demoUsers.map((u, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setForm({ email: u.email, password: u.password, remember_me: true })}
+                  className="px-2 py-2 rounded-xl text-center transition-all press-effect"
+                  style={{ background: u.bg, border: `1px solid ${u.border}`, color: u.color, fontSize: '11px', fontWeight: 700, lineHeight: 1.3 }}
+                  title={`${u.email} / ${u.password}`}
+                >
+                  {u.label}
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Footer */}
-          <div className="divider" />
-          <p className="text-center text-xs" style={{ color: '#526080' }}>
-            نظام آمن ومحمي · جميع العمليات مسجلة ومُراقبة
+          <p className="text-center text-[11px] mt-4 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', color: '#2d4060' }}>
+            🔒 نظام آمن · جميع العمليات مسجلة ومراقبة
           </p>
         </div>
 
         {/* Version */}
-        <p className="text-center text-xs mt-4" style={{ color: '#2a3850' }}>
+        <p className="text-center text-[11px] mt-4" style={{ color: '#1e3050' }}>
           IT-EDMS v1.0 &mdash; قسم تقنية المعلومات والأنظمة
         </p>
       </div>

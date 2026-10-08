@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { documentsAPI, categoriesAPI, documentTypesAPI, settingsAPI, organizationsAPI, departmentsAPI, attachmentsAPI } from '../services/api';
 import { useAuthStore } from '../store/authStore';
@@ -243,8 +243,8 @@ export default function CreateDocumentPage() {
 
       {/* Header */}
       <div className="page-header">
-        <div className="flex items-center gap-3">
-          <button type="button" className="btn btn-secondary btn-icon" onClick={() => navigate(-1)}>
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <button type="button" className="btn btn-secondary btn-icon" onClick={() => navigate(-1)} title="رجوع">
             <ArrowRight size={16} />
           </button>
           <div>
@@ -252,18 +252,18 @@ export default function CreateDocumentPage() {
             <p className="page-subtitle">إنشاء وثيقة جديدة في النظام</p>
           </div>
         </div>
-        <button type="submit" disabled={saving} className="btn btn-primary">
+        <button type="submit" disabled={saving} className="btn btn-primary w-full sm:w-auto">
           {saving ? <><Loader2 size={15} className="animate-spin-slow" /> جاري الحفظ...</> : <><Save size={15} /> حفظ الوثيقة</>}
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
 
         {/* ── Left: Main Form ── */}
         <div className="lg:col-span-2 space-y-5">
 
           {/* Basic Info */}
-          <div className="glass p-6 space-y-4">
+          <div className="glass p-4 sm:p-6 space-y-4">
             <h2 className="font-bold text-sm uppercase tracking-wide" style={{ color: '#526080' }}>المعلومات الأساسية</h2>
 
             {/* Title */}

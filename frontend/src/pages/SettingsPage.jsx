@@ -50,7 +50,7 @@ export default function SettingsPage() {
 
         <button
           onClick={handleBackup}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-sm font-semibold transition"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-sm font-semibold transition"
         >
           <DownloadCloud className="w-4 h-4 text-emerald-400" />
           نسخ احتياطي فوري (Backup)
@@ -60,7 +60,7 @@ export default function SettingsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Settings Form */}
         <div className="lg:col-span-2 space-y-6">
-          <form onSubmit={handleSave} className="bg-slate-900/60 rounded-2xl border border-slate-800 p-6 backdrop-blur-md space-y-6">
+          <form onSubmit={handleSave} className="bg-slate-900/60 rounded-2xl border border-slate-800 p-4 sm:p-6 backdrop-blur-md space-y-6">
             <h2 className="text-base font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
               <FileCode className="w-5 h-5 text-blue-400" />
               سياسة الترقيم والترميز التلقائي (Automatic Numbering Schema)

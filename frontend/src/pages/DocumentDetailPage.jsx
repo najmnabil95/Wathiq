@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   documentsAPI,
@@ -324,164 +325,164 @@ export default function DocumentDetailPage() {
       {/* ── ON-SCREEN INTERACTIVE INTERFACE (Hidden during print) ── */}
       <div className="no-print space-y-6 pb-12 animate-fade-in">
         {/* ── Breadcrumb & Actions Bar ───────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <Link
-            to="/documents"
-            className="p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition"
-            title="العودة لقائمة الوثائق"
-          >
-            <ArrowRight className="w-5 h-5" />
-          </Link>
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-mono text-sm font-bold px-2.5 py-0.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                {document.document_number}
-              </span>
-              <span className={`text-xs px-2.5 py-0.5 rounded-lg border font-medium ${statusColors[statusName] || statusColors.draft}`}>
-                {statusLabel}
-              </span>
-              <span className={`text-xs px-2.5 py-0.5 rounded-lg border font-medium ${confidentialityColors[confName] || confidentialityColors.internal}`}>
-                {confLabel}
-              </span>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-900/60 p-3.5 sm:p-5 rounded-2xl border border-slate-800 backdrop-blur-md">
+          <div className="flex items-start sm:items-center gap-3">
+            <Link
+              to="/documents"
+              className="p-2 sm:p-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition shrink-0 mt-0.5 sm:mt-0"
+              title="العودة لقائمة الوثائق"
+            >
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1">
+                <span className="font-mono text-xs sm:text-sm font-bold px-2 sm:px-2.5 py-0.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  {document.document_number}
+                </span>
+                <span className={`text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-lg border font-medium ${statusColors[statusName] || statusColors.draft}`}>
+                  {statusLabel}
+                </span>
+                <span className={`text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-lg border font-medium ${confidentialityColors[confName] || confidentialityColors.internal}`}>
+                  {confLabel}
+                </span>
+              </div>
+              <h1 className="text-base sm:text-xl font-bold text-white tracking-tight break-words">{document.title}</h1>
             </div>
-            <h1 className="text-xl font-bold text-white tracking-tight">{document.title}</h1>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-white/5">
+            {statusName === 'pending_approval' && (
+              <>
+                <button
+                  onClick={() => setApprovalModal({ open: true, type: 'approve' })}
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-emerald-600/20 transition"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  اعتماد
+                </button>
+                <button
+                  onClick={() => setApprovalModal({ open: true, type: 'reject' })}
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs sm:text-sm font-semibold transition"
+                >
+                  <XCircle className="w-4 h-4" />
+                  رفض
+                </button>
+              </>
+            )}
+
+            {statusName !== 'archived' ? (
+              <button
+                onClick={handleArchive}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs sm:text-sm font-medium transition"
+              >
+                <Archive className="w-4 h-4 text-amber-400" />
+                أرشفة
+              </button>
+            ) : (
+              <button
+                onClick={handleRestore}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs sm:text-sm font-medium transition"
+              >
+                <RotateCcw className="w-4 h-4 text-emerald-400" />
+                استعادة
+              </button>
+            )}
+
+            <button
+              onClick={() => {
+                setEditForm({
+                  title: document.title || '',
+                  description: document.description || '',
+                  notes: document.notes || '',
+                });
+                setEditModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs sm:text-sm font-medium transition"
+              title="تعديل بيانات الوثيقة"
+            >
+              <Edit3 className="w-4 h-4 text-blue-400" />
+              تعديل
+            </button>
+
+            <button
+              onClick={handlePrintReport}
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-medium transition shadow-sm"
+              title="طباعة الاستمارة الأرشيفية الرسمية A4"
+            >
+              <Printer className="w-4 h-4 text-emerald-400" />
+              <span className="hidden sm:inline">طباعة الوثيقة</span> (A4)
+            </button>
+
+            <button
+              onClick={handlePrintLabel}
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs sm:text-sm font-medium transition"
+              title="طباعة ملصق الباركود للحفظ الميداني"
+            >
+              <QrCode className="w-4 h-4" />
+              ملصق الباركود
+            </button>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          {statusName === 'pending_approval' && (
-            <>
-              <button
-                onClick={() => setApprovalModal({ open: true, type: 'approve' })}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-lg shadow-emerald-600/20 transition"
-              >
-                <CheckCircle className="w-4 h-4" />
-                اعتماد
-              </button>
-              <button
-                onClick={() => setApprovalModal({ open: true, type: 'reject' })}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-sm font-semibold transition"
-              >
-                <XCircle className="w-4 h-4" />
-                رفض
-              </button>
-            </>
-          )}
-
-          {statusName !== 'archived' ? (
-            <button
-              onClick={handleArchive}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-sm font-medium transition"
-            >
-              <Archive className="w-4 h-4 text-amber-400" />
-              أرشفة
-            </button>
-          ) : (
-            <button
-              onClick={handleRestore}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-sm font-medium transition"
-            >
-              <RotateCcw className="w-4 h-4 text-emerald-400" />
-              استعادة
-            </button>
-          )}
-
+        {/* ── Navigation Tabs ───────────────────────────────────────── */}
+        <div className="flex border-b border-slate-800 gap-1 sm:gap-2 overflow-x-auto no-scrollbar no-print pb-0.5">
           <button
-            onClick={() => {
-              setEditForm({
-                title: document.title || '',
-                description: document.description || '',
-                notes: document.notes || '',
-              });
-              setEditModalOpen(true);
-            }}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-sm font-medium transition"
-            title="تعديل بيانات الوثيقة"
+            onClick={() => setActiveTab('overview')}
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition shrink-0 whitespace-nowrap ${
+              activeTab === 'overview'
+                ? 'border-blue-500 text-blue-400 bg-blue-500/5'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
           >
-            <Edit3 className="w-4 h-4 text-blue-400" />
-            تعديل
+            <FileText className="w-4 h-4" />
+            البطاقة والبيانات الأرشيفية
           </button>
-
           <button
-            onClick={handlePrintReport}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-sm font-medium transition shadow-sm"
-            title="طباعة الاستمارة الأرشيفية الرسمية A4"
+            onClick={() => setActiveTab('attachments')}
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition shrink-0 whitespace-nowrap ${
+              activeTab === 'attachments'
+                ? 'border-blue-500 text-blue-400 bg-blue-500/5'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
           >
-            <Printer className="w-4 h-4 text-emerald-400" />
-            طباعة الوثيقة (A4)
+            <Layers className="w-4 h-4" />
+            المرفقات ({document.attachments?.length || 0})
           </button>
-
           <button
-            onClick={handlePrintLabel}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-sm font-medium transition"
-            title="طباعة ملصق الباركود للحفظ الميداني"
+            onClick={() => setActiveTab('label')}
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition shrink-0 whitespace-nowrap ${
+              activeTab === 'label'
+                ? 'border-blue-500 text-blue-400 bg-blue-500/5'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
           >
             <QrCode className="w-4 h-4" />
-            طباعة ملصق الباركود
+            ملصق الباركود
+          </button>
+          <button
+            onClick={() => setActiveTab('report')}
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition shrink-0 whitespace-nowrap ${
+              activeTab === 'report'
+                ? 'border-blue-500 text-blue-400 bg-blue-500/5'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Printer className="w-4 h-4 text-emerald-400" />
+            استمارة A4
+          </button>
+          <button
+            onClick={() => setActiveTab('audit')}
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition shrink-0 whitespace-nowrap ${
+              activeTab === 'audit'
+                ? 'border-blue-500 text-blue-400 bg-blue-500/5'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            سجل التدقيق
           </button>
         </div>
-      </div>
-
-      {/* ── Navigation Tabs ───────────────────────────────────────── */}
-      <div className="flex border-b border-slate-800 gap-2 overflow-x-auto no-print">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition shrink-0 ${
-            activeTab === 'overview'
-              ? 'border-blue-500 text-blue-400 bg-blue-500/5'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          البطاقة والبيانات الأرشيفية
-        </button>
-        <button
-          onClick={() => setActiveTab('attachments')}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition shrink-0 ${
-            activeTab === 'attachments'
-              ? 'border-blue-500 text-blue-400 bg-blue-500/5'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-          الملفات والمرفقات ({document.attachments?.length || 0})
-        </button>
-        <button
-          onClick={() => setActiveTab('label')}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition shrink-0 ${
-            activeTab === 'label'
-              ? 'border-blue-500 text-blue-400 bg-blue-500/5'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <QrCode className="w-4 h-4" />
-          ملصق الحفظ الفعلي والباركود
-        </button>
-        <button
-          onClick={() => setActiveTab('report')}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition shrink-0 ${
-            activeTab === 'report'
-              ? 'border-blue-500 text-blue-400 bg-blue-500/5'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Printer className="w-4 h-4 text-emerald-400" />
-          استمارة الوثيقة الرسمية (A4)
-        </button>
-        <button
-          onClick={() => setActiveTab('audit')}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition shrink-0 ${
-            activeTab === 'audit'
-              ? 'border-blue-500 text-blue-400 bg-blue-500/5'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Clock className="w-4 h-4" />
-          سجل الحركات والتدقيق
-        </button>
-      </div>
 
       {/* ── TAB 1: OVERVIEW ────────────────────────────────────────── */}
       {activeTab === 'overview' && (
@@ -971,31 +972,50 @@ export default function DocumentDetailPage() {
       )}
 
       {/* ── APPROVAL / REJECTION MODAL ──────────────────────────────── */}
-      {approvalModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md space-y-4">
-            <h3 className="text-lg font-bold text-white">
-              {approvalModal.type === 'approve' ? 'تأكيد اعتماد الوثيقة' : 'تأكيد رفض الوثيقة'}
-            </h3>
-            <p className="text-xs text-slate-400">
-              {approvalModal.type === 'approve'
-                ? 'عند اعتماد الوثيقة ستصبح معتمدة ورسمية ومتاحة للمصرح لهم.'
-                : 'يرجى كتابة سبب رفض هذه الوثيقة لإخطار المنشئ بالملاحظات.'}
-            </p>
-
-            <textarea
-              rows={3}
-              placeholder="اكتب ملاحظاتك هنا..."
-              value={approvalComment}
-              onChange={(e) => setApprovalComment(e.target.value)}
-              className="w-full bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
-            />
-
-            <div className="flex justify-end gap-3 pt-2">
+      {approvalModal.open && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md"
+          style={{ direction: 'rtl', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
+          onClick={() => setApprovalModal({ open: false, type: 'approve' })}
+        >
+          <div
+            className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto text-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-slate-900/95">
+              <h3 className="text-base font-bold text-white">
+                {approvalModal.type === 'approve' ? 'تأكيد اعتماد الوثيقة' : 'تأكيد رفض الوثيقة'}
+              </h3>
               <button
                 type="button"
                 onClick={() => setApprovalModal({ open: false, type: 'approve' })}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition"
+                className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              <p className="text-xs text-slate-400">
+                {approvalModal.type === 'approve'
+                  ? 'عند اعتماد الوثيقة ستصبح معتمدة ورسمية ومتاحة للمصرح لهم.'
+                  : 'يرجى كتابة سبب رفض هذه الوثيقة لإخطار المنشئ بالملاحظات.'}
+              </p>
+
+              <textarea
+                rows={4}
+                placeholder="اكتب ملاحظاتك وتوجيهاتك الإدارية هنا..."
+                value={approvalComment}
+                onChange={(e) => setApprovalComment(e.target.value)}
+                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition resize-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-slate-900/95 shrink-0">
+              <button
+                type="button"
+                onClick={() => setApprovalModal({ open: false, type: 'approve' })}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition cursor-pointer"
               >
                 إلغاء
               </button>
@@ -1003,7 +1023,7 @@ export default function DocumentDetailPage() {
                 type="button"
                 disabled={isProcessing}
                 onClick={approvalModal.type === 'approve' ? handleApprove : handleReject}
-                className={`px-5 py-2 rounded-xl text-white text-sm font-semibold transition ${
+                className={`px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition cursor-pointer ${
                   approvalModal.type === 'approve'
                     ? 'bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/20'
                     : 'bg-rose-600 hover:bg-rose-500 shadow-lg shadow-rose-600/20'
@@ -1013,69 +1033,89 @@ export default function DocumentDetailPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── EDIT DOCUMENT MODAL ──────────────────────────────────────── */}
-      {editModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg space-y-4">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Edit3 className="w-5 h-5 text-blue-400" />
-              تعديل بيانات الوثيقة
-            </h3>
+      {editModalOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md"
+          style={{ direction: 'rtl', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
+          onClick={() => setEditModalOpen(false)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto text-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-slate-900/95">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-blue-400" />
+                تعديل بيانات الوثيقة
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
 
-            <form onSubmit={handleUpdateDocument} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">عنوان الوثيقة *</label>
-                <input
-                  type="text"
-                  required
-                  value={editForm.title}
-                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
-                />
+            <form onSubmit={handleUpdateDocument} className="flex flex-col flex-1 overflow-hidden m-0">
+              <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">عنوان الوثيقة *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">الوصف والبيان</label>
+                  <textarea
+                    rows={3}
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">ملاحظات إضافية</label>
+                  <input
+                    type="text"
+                    value={editForm.notes}
+                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">الوصف والبيان</label>
-                <textarea
-                  rows={3}
-                  value={editForm.description}
-                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">ملاحظات إضافية</label>
-                <input
-                  type="text"
-                  value={editForm.notes}
-                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-slate-900/95 shrink-0">
                 <button
                   type="button"
                   onClick={() => setEditModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition cursor-pointer"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
                   disabled={isProcessing}
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition shadow-lg shadow-blue-600/20 disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition shadow-lg shadow-blue-600/20 disabled:opacity-50 cursor-pointer"
                 >
                   {isProcessing ? 'جاري الحفظ...' : 'حفظ التعديلات'}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       </div>
 

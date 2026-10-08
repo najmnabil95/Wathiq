@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   departmentsAPI
 } from '../services/api';
@@ -255,17 +256,17 @@ export default function DepartmentsPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => handleOpenCreate(null)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-sm font-semibold transition"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-semibold transition"
           >
             <Plus className="w-4 h-4 text-blue-400" />
             إضافة قسم رئيسي
           </button>
           <button
             onClick={() => handleOpenCreate(rootDepartments[0]?.id || null)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-lg shadow-blue-600/25 transition"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-blue-600/25 transition"
           >
             <GitFork className="w-4 h-4" />
             إضافة فرع داخل قسم
@@ -549,10 +550,18 @@ export default function DepartmentsPage() {
       )}
 
       {/* ── CREATE / EDIT MODAL ────────────────────────────────────── */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+      {modalOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md"
+          style={{ direction: 'rtl', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
+          onClick={() => setModalOpen(false)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto text-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-slate-900/95">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
                   {isBranch ? <GitFork className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
@@ -570,7 +579,17 @@ export default function DepartmentsPage() {
                   </p>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
             </div>
+
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden m-0">
+              <div className="p-6 overflow-y-auto flex-1 space-y-4">
 
             {/* Type Switcher (only in create mode) */}
             {modalMode === 'create' && (
@@ -613,9 +632,8 @@ export default function DepartmentsPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Parent Department Selection (if branch) */}
-              {isBranch && (
+            {/* Parent Department Selection (if branch) */}
+            {isBranch && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                     القسم الرئيسي التابع له هذا الفرع <span className="text-rose-400">*</span>
@@ -709,26 +727,29 @@ export default function DepartmentsPage() {
                 </label>
               </div>
 
-              {/* Buttons */}
-              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+              </div>
+
+              {/* Fixed Footer */}
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-slate-900/95 shrink-0">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition cursor-pointer"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-lg shadow-blue-600/25 transition disabled:opacity-50"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-lg shadow-blue-600/25 transition disabled:opacity-50 cursor-pointer"
                 >
                   {saving ? 'جاري الحفظ...' : (modalMode === 'create' ? 'إنشاء وحفظ' : 'تحديث البيانات')}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

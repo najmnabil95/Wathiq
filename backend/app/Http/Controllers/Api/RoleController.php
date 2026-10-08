@@ -8,6 +8,7 @@ use App\Models\Permission;
 use App\Services\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class RoleController extends Controller
@@ -146,24 +147,58 @@ class RoleController extends Controller
     {
         $this->authorizeAccess($request);
 
+        // Sanitize machine name if supplied
+        if ($request->filled('name')) {
+            $cleaned = strtolower(trim(preg_replace('/[^a-zA-Z0-9_]/', '_', $request->input('name')), '_'));
+            $request->merge(['name' => $cleaned]);
+        }
+
         $validated = $request->validate([
-            'name'            => 'required|string|max:100|unique:roles,name',
-            'display_name'    => 'required|string|max:255',
+            'name'            => 'nullable|string|max:100|unique:roles,name',
+            'display_name'    => 'nullable|string|max:255',
             'display_name_ar' => 'required|string|max:255',
             'description'     => 'nullable|string|max:1000',
             'permissions'     => 'nullable|array',
             'permissions.*'   => 'string|exists:permissions,name',
+            'clone_from_id'   => 'nullable|exists:roles,id',
+        ], [
+            'display_name_ar.required' => 'يرجى إدخال مسمى الدور الوظيفي بالعربية',
+            'name.unique'             => 'الرمز البرمجي للدور مستخدم مسبقاً، يرجى اختيار رمز آخر',
         ]);
 
+        $displayNameAr = trim($validated['display_name_ar']);
+        $displayName   = !empty($validated['display_name']) ? trim($validated['display_name']) : $displayNameAr;
+
+        // Auto-generate unique machine name if not supplied
+        $machineName = !empty($validated['name']) ? $validated['name'] : null;
+        if (empty($machineName)) {
+            $candidateBase = Str::slug($displayName, '_');
+            if (empty($candidateBase)) {
+                $candidateBase = 'role_' . strtolower(Str::random(6));
+            }
+            $candidate = $candidateBase;
+            $counter = 1;
+            while (Role::where('name', $candidate)->exists()) {
+                $candidate = $candidateBase . '_' . $counter++;
+            }
+            $machineName = $candidate;
+        }
+
         $role = Role::create([
-            'name'            => $validated['name'],
-            'display_name'    => $validated['display_name'],
-            'display_name_ar' => $validated['display_name_ar'],
+            'name'            => $machineName,
+            'display_name'    => $displayName,
+            'display_name_ar' => $displayNameAr,
             'description'     => $validated['description'] ?? null,
             'is_system'       => false,
         ]);
 
-        if (!empty($validated['permissions'])) {
+        // Copy permissions if cloning from an existing role or if array provided
+        if (!empty($validated['clone_from_id'])) {
+            $sourceRole = Role::with('permissions')->find($validated['clone_from_id']);
+            if ($sourceRole && $sourceRole->permissions->isNotEmpty()) {
+                $role->permissions()->sync($sourceRole->permissions->pluck('id'));
+            }
+        } elseif (!empty($validated['permissions'])) {
             $role->syncPermissions($validated['permissions']);
         }
 
@@ -175,10 +210,12 @@ class RoleController extends Controller
             "إنشاء دور وظيفي جديد: {$role->display_name_ar}"
         );
 
+        $role->loadCount(['permissions', 'users'])->load('permissions');
+
         return response()->json([
             'success' => true,
             'message' => 'تم إنشاء الدور الوظيفي بنجاح',
-            'data'    => $role->load(['permissions', 'users']),
+            'data'    => $role,
         ], 201);
     }
 
@@ -236,7 +273,7 @@ class RoleController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'تم تحديث الدور وصلاحياته بنجاح',
-            'data'    => $role->load(['permissions', 'users']),
+            'data'    => $role->loadCount(['permissions', 'users'])->load('permissions'),
         ]);
     }
 

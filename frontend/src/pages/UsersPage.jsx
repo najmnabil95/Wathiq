@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { usersAPI, rolesAPI, departmentsAPI } from '../services/api';
 import { useAuthStore } from '../store/authStore';
@@ -186,28 +187,28 @@ export default function UsersPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <Link
             to="/roles"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-sm transition"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs sm:text-sm transition"
           >
             <ShieldCheck className="w-4 h-4 text-blue-400" />
-            شجرة الصلاحيات ومصفوفة الأدوار
+            شجرة الصلاحيات
           </Link>
 
           <button
             onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition shadow-lg shadow-blue-600/20"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs sm:text-sm transition shadow-lg shadow-blue-600/20"
           >
             <UserPlus className="w-4 h-4" />
-            إضافة مستخدم جديد
+            إضافة مستخدم
           </button>
         </div>
       </div>
 
       {/* ── Filters Bar ────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto flex-1">
           <div className="relative w-full sm:w-72">
             <Search className="w-4 h-4 absolute right-3.5 top-3.5 text-slate-500" />
             <input
@@ -222,7 +223,7 @@ export default function UsersPage() {
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className="bg-slate-900/80 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-blue-500"
+            className="w-full sm:w-auto bg-slate-900/80 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-blue-500"
           >
             <option value="">جميع الأدوار والصلاحيات</option>
             <option value="super_admin">مدير عام النظام (Super Admin)</option>
@@ -354,133 +355,147 @@ export default function UsersPage() {
       </div>
 
       {/* ── CREATE / EDIT MODAL ────────────────────────────────────── */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-lg space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-lg font-bold text-white">
+      {modalOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md"
+          style={{ direction: 'rtl', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
+          onClick={() => setModalOpen(false)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto text-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-slate-900/95">
+              <h3 className="text-base font-bold text-white">
                 {editingUser ? 'تعديل بيانات المستخدم' : 'إضافة مستخدم جديد'}
               </h3>
               <button
+                type="button"
                 onClick={() => setModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">الاسم الثلاثي أو الكامل *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="مثال: م. نجم الدين اليافوز"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">البريد الإلكتروني المهني *</label>
-                <input
-                  type="email"
-                  required
-                  placeholder="name@organization.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  {editingUser ? 'تغيير كلمة المرور (اتركها فارغة للإبقاء على الحالية)' : 'كلمة المرور *'}
-                </label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Scrollable Form Body */}
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden m-0">
+              <div className="p-6 overflow-y-auto flex-1 space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">الدور والصلاحية (Role)</label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="super_admin">مدير عام النظام (Super Admin)</option>
-                    <option value="it_manager">مدير إدارة IT (IT Manager)</option>
-                    <option value="it_staff">مسؤول أرشفة ودعم (Archivist)</option>
-                    <option value="viewer">مشاهد ومستطلع (Viewer)</option>
-                  </select>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">الاسم الثلاثي أو الكامل *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="مثال: م. نجم الدين اليافوز"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">القسم أو الفرع التابع</label>
-                  <select
-                    value={formData.department_id}
-                    onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
-                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="">اختر القسم أو الفرع...</option>
-                    {departments.filter(d => !d.parent_id).map(root => {
-                      const branches = departments.filter(d => d.parent_id === root.id);
-                      return (
-                        <optgroup key={root.id} label={`🏛️ ${root.name_ar || root.name} (${root.code})`}>
-                          <option value={root.id}>
-                            {root.name_ar || root.name} (الإدارة المركزية)
-                          </option>
-                          {branches.map(b => (
-                            <option key={b.id} value={b.id}>
-                              &nbsp;&nbsp;&nbsp;&nbsp;↳ {b.name_ar || b.name} ({b.code})
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">البريد الإلكتروني المهني *</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="name@organization.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    {editingUser ? 'تغيير كلمة المرور (اتركها فارغة للإبقاء على الحالية)' : 'كلمة المرور *'}
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">الدور والصلاحية (Role)</label>
+                    <select
+                      value={formData.role}
+                      onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                      className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="super_admin">مدير عام النظام (Super Admin)</option>
+                      <option value="it_manager">مدير إدارة IT (IT Manager)</option>
+                      <option value="it_staff">مسؤول أرشفة ودعم (Archivist)</option>
+                      <option value="viewer">مشاهد ومستطلع (Viewer)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">القسم أو الفرع التابع</label>
+                    <select
+                      value={formData.department_id}
+                      onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
+                      className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="">اختر القسم أو الفرع...</option>
+                      {departments.filter(d => !d.parent_id).map(root => {
+                        const branches = departments.filter(d => d.parent_id === root.id);
+                        return (
+                          <optgroup key={root.id} label={`🏛️ ${root.name_ar || root.name} (${root.code})`}>
+                            <option value={root.id}>
+                              {root.name_ar || root.name} (الإدارة المركزية)
                             </option>
-                          ))}
-                        </optgroup>
-                      );
-                    })}
-                  </select>
+                            {branches.map(b => (
+                              <option key={b.id} value={b.id}>
+                                &nbsp;&nbsp;&nbsp;&nbsp;↳ {b.name_ar || b.name} ({b.code})
+                              </option>
+                            ))}
+                          </optgroup>
+                        );
+                      })}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="user-status-toggle"
+                    checked={formData.is_active}
+                    onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                    className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-blue-600 focus:ring-0 cursor-pointer"
+                  />
+                  <label htmlFor="user-status-toggle" className="text-xs font-medium text-slate-300 cursor-pointer">
+                    حساب نشط ومصرح له بالدخول للنظام
+                  </label>
                 </div>
               </div>
 
-              <div className="pt-2 flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="user-status-toggle"
-                  checked={formData.is_active}
-                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                  className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-blue-600 focus:ring-0 cursor-pointer"
-                />
-                <label htmlFor="user-status-toggle" className="text-xs font-medium text-slate-300 cursor-pointer">
-                  حساب نشط ومصرح له بالدخول للنظام
-                </label>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+              {/* Fixed Footer */}
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-slate-900/95 shrink-0">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition cursor-pointer"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition shadow-lg shadow-blue-600/20 disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition shadow-lg shadow-blue-600/20 disabled:opacity-50 cursor-pointer"
                 >
                   {saving ? 'جاري الحفظ...' : editingUser ? 'تحديث البيانات' : 'إنشاء الحساب'}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

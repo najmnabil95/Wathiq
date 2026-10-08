@@ -25,6 +25,14 @@ Route::get('/', function () {
     return redirect(env('FRONTEND_URL', 'http://localhost:5173'));
 });
 
+// Named route for login redirect fallback
+Route::get('/login', function () {
+    if (file_exists(public_path('index.html'))) {
+        return response()->file(public_path('index.html'));
+    }
+    return redirect('/');
+})->name('login');
+
 // SPA Catch-All: Enables browser refresh and deep-linking for all React routes
 Route::fallback(function () {
     if (request()->is('api/*') || (request()->wantsJson() && !request()->acceptsHtml())) {

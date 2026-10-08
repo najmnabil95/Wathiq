@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { auditAPI } from '../services/api';
 import {
   Activity, Shield, Search, Filter, Calendar, User,
@@ -154,8 +155,8 @@ export default function AuditPage() {
       </div>
 
       {/* ── Filters Bar ────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto flex-1">
           <div className="relative w-full sm:w-80">
             <Search className="w-4 h-4 absolute right-3.5 top-3.5 text-slate-500" />
             <input
@@ -170,7 +171,7 @@ export default function AuditPage() {
           <select
             value={actionFilter}
             onChange={(e) => setActionFilter(e.target.value)}
-            className="bg-slate-900/80 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-blue-500"
+            className="w-full sm:w-auto bg-slate-900/80 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-blue-500"
           >
             <option value="">جميع أنواع العمليات</option>
             <option value="document_created">إنشاء وثيقة</option>
@@ -202,8 +203,8 @@ export default function AuditPage() {
             <p className="text-sm">لا توجد حركات مسجلة مطابقة للبحث</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-sm">
+          <div className="table-responsive">
+            <table className="w-full text-right text-sm min-w-[720px]">
               <thead className="bg-slate-950/60 border-b border-slate-800 text-xs font-semibold text-slate-400">
                 <tr>
                   <th className="p-4">نوع العملية</th>
@@ -276,24 +277,31 @@ export default function AuditPage() {
       </div>
 
       {/* ── LOG DETAIL MODAL ───────────────────────────────────────── */}
-      {selectedLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+      {selectedLog && typeof document !== 'undefined' && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in"
+        >
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Activity className="w-4 h-4 text-purple-400" />
+                <Activity className="w-5 h-5 text-purple-400" />
                 تفاصيل السجل التقني #{selectedLog.id}
               </h3>
               <button
+                type="button"
                 onClick={() => setSelectedLog(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+            {/* Modal Scrollable Body */}
+            <div className="p-6 overflow-y-auto space-y-4 text-xs">
+              <div className="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
                 <span className="text-slate-500 block mb-1">البيان والحدث:</span>
                 <span className="font-semibold text-slate-200 text-sm">{selectedLog.description}</span>
               </div>
@@ -319,8 +327,8 @@ export default function AuditPage() {
 
               {selectedLog.old_values && (
                 <div>
-                  <span className="text-slate-400 block mb-1">البيانات السابقة (Old Values):</span>
-                  <pre className="bg-slate-950 p-3 rounded-xl border border-slate-800 font-mono text-[11px] text-slate-300 overflow-x-auto max-h-36">
+                  <span className="text-slate-400 block mb-1 font-medium">البيانات السابقة (Old Values):</span>
+                  <pre className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 font-mono text-[11px] text-slate-300 overflow-x-auto max-h-40">
                     {JSON.stringify(selectedLog.old_values, null, 2)}
                   </pre>
                 </div>
@@ -328,15 +336,16 @@ export default function AuditPage() {
 
               {selectedLog.new_values && (
                 <div>
-                  <span className="text-slate-400 block mb-1">البيانات الجديدة (New Values):</span>
-                  <pre className="bg-slate-950 p-3 rounded-xl border border-slate-800 font-mono text-[11px] text-emerald-300 overflow-x-auto max-h-36">
+                  <span className="text-slate-400 block mb-1 font-medium">البيانات الجديدة (New Values):</span>
+                  <pre className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 font-mono text-[11px] text-emerald-300 overflow-x-auto max-h-40">
                     {JSON.stringify(selectedLog.new_values, null, 2)}
                   </pre>
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end pt-3 border-t border-slate-800">
+            {/* Modal Footer */}
+            <div className="flex justify-end px-6 py-3.5 border-t border-slate-800 bg-slate-900/90 backdrop-blur-md">
               <button
                 type="button"
                 onClick={() => setSelectedLog(null)}
@@ -346,7 +355,8 @@ export default function AuditPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
