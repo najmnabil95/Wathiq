@@ -4,39 +4,50 @@ import { authAPI } from '../services/api';
 
 export const useAuthStore = create(
   persist(
-    (set, get) => ({
-      user: null,
-      token: null,
-      isLoading: false,
-      error: null,
+    (set, get) => {
+      if (typeof window !== 'undefined') {
+        window.__edms_logout = () => {
+          localStorage.removeItem('edms_token');
+          localStorage.removeItem('edms_user');
+          localStorage.removeItem('edms-auth');
+          set({ user: null, token: null, isLoading: false, error: null });
+        };
+      }
 
-      // ── Login ───────────────────────────────────────────────
-      login: async (email, password, rememberMe = false) => {
-        set({ isLoading: true, error: null });
-        try {
-          const res = await authAPI.login({ email, password, remember_me: rememberMe });
-          const { token, user } = res.data.data;
+      return {
+        user: null,
+        token: null,
+        isLoading: false,
+        error: null,
 
-          localStorage.setItem('edms_token', token);
-          localStorage.setItem('edms_user', JSON.stringify(user));
+        // ── Login ───────────────────────────────────────────────
+        login: async (email, password, rememberMe = false) => {
+          set({ isLoading: true, error: null });
+          try {
+            const res = await authAPI.login({ email, password, remember_me: rememberMe });
+            const { token, user } = res.data.data;
 
-          set({ user, token, isLoading: false, error: null });
-          return { success: true };
-        } catch (err) {
-          const msg = err.response?.data?.message || 'فشل تسجيل الدخول. تحقق من بياناتك.';
-          const errors = err.response?.data?.errors || null;
-          set({ isLoading: false, error: msg });
-          return { success: false, message: msg, errors };
-        }
-      },
+            localStorage.setItem('edms_token', token);
+            localStorage.setItem('edms_user', JSON.stringify(user));
 
-      // ── Logout ─────────────────────────────────────────────
-      logout: async () => {
-        try { await authAPI.logout(); } catch (_) {}
-        localStorage.removeItem('edms_token');
-        localStorage.removeItem('edms_user');
-        set({ user: null, token: null });
-      },
+            set({ user, token, isLoading: false, error: null });
+            return { success: true };
+          } catch (err) {
+            const msg = err.response?.data?.message || 'فشل تسجيل الدخول. تحقق من بياناتك.';
+            const errors = err.response?.data?.errors || null;
+            set({ isLoading: false, error: msg });
+            return { success: false, message: msg, errors };
+          }
+        },
+
+        // ── Logout ─────────────────────────────────────────────
+        logout: async () => {
+          try { await authAPI.logout(); } catch (_) {}
+          localStorage.removeItem('edms_token');
+          localStorage.removeItem('edms_user');
+          localStorage.removeItem('edms-auth');
+          set({ user: null, token: null, isLoading: false, error: null });
+        },
 
       // ── Fetch Me ───────────────────────────────────────────
       fetchMe: async () => {
@@ -67,10 +78,11 @@ export const useAuthStore = create(
       },
 
       setUser: (user) => set({ user }),
-    }),
-    {
-      name: 'edms-auth',
-      partialize: (state) => ({ user: state.user, token: state.token }),
-    }
+    };
+  },
+  {
+    name: 'edms-auth',
+    partialize: (state) => ({ user: state.user, token: state.token }),
+  }
   )
 );

@@ -12,7 +12,16 @@ const api = axios.create({
 // ── Request Interceptor — Attach token ──────────────────────────
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('edms_token');
+    let token = localStorage.getItem('edms_token');
+    if (!token) {
+      try {
+        const storedAuth = localStorage.getItem('edms-auth');
+        if (storedAuth) {
+          const parsed = JSON.parse(storedAuth);
+          token = parsed?.state?.token;
+        }
+      } catch (_) {}
+    }
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -22,14 +31,30 @@ api.interceptors.request.use(
 );
 
 // ── Response Interceptor — Handle errors globally ───────────────
+let isHandling401 = false;
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('edms_token');
-      localStorage.removeItem('edms_user');
-      window.location.href = '/login';
+      const isLoginRequest = error.config?.url?.includes('/auth/login');
+      if (!isLoginRequest && !isHandling401) {
+        isHandling401 = true;
+        // Purge token and user across all stores to prevent any redirect bounce
+        localStorage.removeItem('edms_token');
+        localStorage.removeItem('edms_user');
+        localStorage.removeItem('edms-auth');
+
+        // Reset memory Zustand state if hook registered
+        if (typeof window !== 'undefined' && typeof window.__edms_logout === 'function') {
+          window.__edms_logout();
+        }
+
+        // Only redirect if not already on the login page
+        if (window.location.pathname !== '/login') {
+          window.location.replace('/login');
+        }
+        setTimeout(() => { isHandling401 = false; }, 2000);
+      }
     }
     return Promise.reject(error);
   }

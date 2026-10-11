@@ -17,14 +17,16 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 // ── Protected Route ─────────────────────────────────────────────
 function ProtectedRoute({ children }) {
   const { token, user } = useAuthStore();
-  if (!token || !user) return <Navigate to="/login" replace />;
+  const isAuthenticated = Boolean(token && user && user.id);
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
   return children;
 }
 
 // ── Public Route (redirect if logged in) ────────────────────────
 function PublicRoute({ children }) {
   const { token, user } = useAuthStore();
-  if (token && user) return <Navigate to="/" replace />;
+  const isAuthenticated = Boolean(token && user && user.id);
+  if (isAuthenticated) return <Navigate to="/" replace />;
   return children;
 }
 
