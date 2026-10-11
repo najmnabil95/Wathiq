@@ -63,7 +63,7 @@ class DocumentController extends Controller
             $query->orderBy($sortField, $sortDir === 'asc' ? 'asc' : 'desc');
         }
 
-        $perPage   = min($request->input('per_page', 15), 100);
+        $perPage   = min((int)$request->input('per_page', 15), 500);
         $documents = $query->paginate($perPage);
 
         return response()->json(['success' => true, 'data' => $documents]);
