@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { documentsAPI, categoriesAPI, departmentsAPI, settingsAPI } from '../services/api';
+import { documentsAPI, attachmentsAPI, categoriesAPI, departmentsAPI, settingsAPI } from '../services/api';
 import {
   Plus, Search, Eye, Archive, Trash2,
   FileText, ChevronRight, ChevronLeft, Download, RefreshCw,
   SlidersHorizontal, X, CheckCircle2, Clock, XCircle,
   ArrowUpDown, ArrowUp, ArrowDown, Printer, FileSpreadsheet,
   Building2, ChevronDown, Layers,
-  Shield, QrCode
+  Shield, QrCode, ExternalLink, FileCheck, AlertCircle, ZoomIn, ZoomOut, RotateCw
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
@@ -54,6 +55,107 @@ export default function DocumentsPage() {
   const [isLoadingReportDocs, setIsLoadingReportDocs] = useState(false);
   const [reportRefNumber, setReportRefNumber] = useState('');
   const exportRef = useRef(null);
+
+  // ── Quick Document Preview Modal State ──
+  const [quickPreviewDoc, setQuickPreviewDoc] = useState(null);
+  const [quickPreviewFull, setQuickPreviewFull] = useState(null);
+  const [quickPreviewLoading, setQuickPreviewLoading] = useState(false);
+  const [quickPreviewAttachment, setQuickPreviewAttachment] = useState(null);
+  const [quickPreviewBlobUrl, setQuickPreviewBlobUrl] = useState(null);
+  const [previewBlobLoading, setPreviewBlobLoading] = useState(false);
+  const [quickPreviewError, setQuickPreviewError] = useState(null);
+  const [previewZoom, setPreviewZoom] = useState(1);
+  const [previewRotation, setPreviewRotation] = useState(0);
+
+  const handleOpenQuickPreview = async (doc, e) => {
+    if (e) e.stopPropagation();
+    setQuickPreviewDoc(doc);
+    setQuickPreviewFull(null);
+    setQuickPreviewAttachment(null);
+    if (quickPreviewBlobUrl) {
+      window.URL.revokeObjectURL(quickPreviewBlobUrl);
+      setQuickPreviewBlobUrl(null);
+    }
+    setQuickPreviewError(null);
+    setPreviewZoom(1);
+    setPreviewRotation(0);
+    setQuickPreviewLoading(true);
+
+    try {
+      const res = await documentsAPI.show(doc.id);
+      const fullDoc = res.data?.data || res.data;
+      setQuickPreviewFull(fullDoc);
+
+      const attachments = fullDoc?.attachments || [];
+      if (attachments.length > 0) {
+        handleSelectPreviewAttachment(doc.id, attachments[0]);
+      }
+    } catch (err) {
+      console.error('Failed to load full document for preview:', err);
+    } finally {
+      setQuickPreviewLoading(false);
+    }
+  };
+
+  const handleSelectPreviewAttachment = async (docId, att) => {
+    setQuickPreviewAttachment(att);
+    setQuickPreviewError(null);
+    setPreviewZoom(1);
+    setPreviewRotation(0);
+
+    const ext = (att.file_name || att.original_name || '').split('.').pop()?.toLowerCase();
+    const isOffice = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext);
+
+    if (isOffice) {
+      if (quickPreviewBlobUrl) {
+        window.URL.revokeObjectURL(quickPreviewBlobUrl);
+        setQuickPreviewBlobUrl(null);
+      }
+      return;
+    }
+
+    try {
+      setPreviewBlobLoading(true);
+      const res = await attachmentsAPI.preview(docId, att.id);
+      if (quickPreviewBlobUrl) {
+        window.URL.revokeObjectURL(quickPreviewBlobUrl);
+      }
+      const mime = res.headers?.['content-type'] || 'application/pdf';
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: mime }));
+      setQuickPreviewBlobUrl(url);
+    } catch (err) {
+      console.error('Failed to preview attachment:', err);
+      setQuickPreviewError('تعذر فتح المعاينة المباشرة لهذا الملف. يمكنك تنزيل الملف والاطلاع عليه محلياً.');
+    } finally {
+      setPreviewBlobLoading(false);
+    }
+  };
+
+  const handleCloseQuickPreview = () => {
+    if (quickPreviewBlobUrl) {
+      window.URL.revokeObjectURL(quickPreviewBlobUrl);
+      setQuickPreviewBlobUrl(null);
+    }
+    setQuickPreviewDoc(null);
+    setQuickPreviewFull(null);
+    setQuickPreviewAttachment(null);
+    setQuickPreviewError(null);
+  };
+
+  const handleDownloadQuickAttachment = async (docId, att) => {
+    try {
+      const res = await attachmentsAPI.download(docId, att.id);
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = window.document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', att.file_name || att.original_name || 'attachment');
+      window.document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      toast.error('فشل تحميل الملف');
+    }
+  };
 
   // Clean print state on afterprint event
   useEffect(() => {
@@ -886,9 +988,10 @@ export default function DocumentsPage() {
 
                       <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                         <button
-                          className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
-                          onClick={() => navigate(`/documents/${doc.id}`)}
-                          title="عرض"
+                          type="button"
+                          className="p-1.5 rounded-lg bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition"
+                          onClick={(e) => handleOpenQuickPreview(doc, e)}
+                          title="معاينة واستعراض سريع"
                         >
                           <Eye size={14} />
                         </button>
@@ -1007,9 +1110,10 @@ export default function DocumentsPage() {
                         <td onClick={e => e.stopPropagation()}>
                           <div className="flex items-center gap-1.5">
                             <button
+                              type="button"
                               className="btn btn-secondary btn-sm flex items-center gap-1.5 text-xs px-2.5 py-1 text-blue-300 hover:text-white hover:bg-blue-600/30 border border-blue-500/25"
-                              onClick={() => navigate(`/documents/${doc.id}`)}
-                              title="استعراض الوثيقة وتفاصيلها والمرفقات"
+                              onClick={(e) => handleOpenQuickPreview(doc, e)}
+                              title="معاينة سريعة واستعراض المرفقات"
                             >
                               <Eye size={13} className="text-blue-400" />
                               <span>استعراض</span>
@@ -1410,6 +1514,351 @@ export default function DocumentsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Quick Document Preview Portal Modal ── */}
+      {quickPreviewDoc && typeof window !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-fade-in"
+          style={{ direction: 'rtl' }}
+          onClick={handleCloseQuickPreview}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden text-slate-100"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-950/60">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                  {quickPreviewDoc.document_number}
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-base font-bold text-white truncate max-w-lg">
+                    {quickPreviewDoc.title}
+                  </h2>
+                  <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
+                    <span>{quickPreviewDoc.category?.name_ar || 'تصنيف عام'}</span>
+                    <span>•</span>
+                    <span>{quickPreviewDoc.department?.name_ar || 'تقنية المعلومات'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const docId = quickPreviewDoc.id;
+                    handleCloseQuickPreview();
+                    navigate(`/documents/${docId}`);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition"
+                  title="فتح صفحة الوثيقة الكاملة"
+                >
+                  <ExternalLink size={13} />
+                  <span>الصفحة الكاملة</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseQuickPreview}
+                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                  title="إغلاق"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: Split into Viewport and Sidebar */}
+            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
+              {/* Viewport Area */}
+              <div className="lg:col-span-8 bg-slate-950/80 p-3 sm:p-4 flex flex-col min-h-[380px] lg:min-h-[540px] border-b lg:border-b-0 lg:border-l border-slate-800/80">
+                {/* Viewport Toolbar */}
+                <div className="flex items-center justify-between gap-2 pb-3 mb-2 border-b border-white/5">
+                  <div className="flex items-center gap-2 text-xs text-slate-300 truncate">
+                    <FileText size={15} className="text-blue-400 shrink-0" />
+                    <span className="font-medium truncate">
+                      {quickPreviewAttachment
+                        ? (quickPreviewAttachment.file_name || quickPreviewAttachment.original_name)
+                        : (quickPreviewLoading ? 'جاري فحص المرفقات...' : 'معاينة الوثيقة')}
+                    </span>
+                    {quickPreviewAttachment?.file_size && (
+                      <span className="text-[11px] font-mono text-slate-500">
+                        ({Math.round(quickPreviewAttachment.file_size / 1024)} KB)
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {quickPreviewAttachment && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewZoom(z => Math.min(z + 0.25, 2.5))}
+                          className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
+                          title="تكبير"
+                        >
+                          <ZoomIn size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewZoom(z => Math.max(z - 0.25, 0.5))}
+                          className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
+                          title="تصغير"
+                        >
+                          <ZoomOut size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewRotation(r => (r + 90) % 360)}
+                          className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
+                          title="تدوير"
+                        >
+                          <RotateCw size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadQuickAttachment(quickPreviewDoc.id, quickPreviewAttachment)}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition"
+                          title="تنزيل المرفق"
+                        >
+                          <Download size={13} className="text-blue-400" />
+                          <span>تنزيل</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Viewport Content */}
+                <div className="flex-1 min-h-0 relative flex items-center justify-center rounded-xl bg-slate-900/50 border border-white/5 overflow-hidden">
+                  {quickPreviewLoading || previewBlobLoading ? (
+                    <div className="flex flex-col items-center justify-center p-8 text-slate-400 gap-3">
+                      <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      <p className="text-xs font-medium">جاري تجهيز المعاينة المباشرة للمستند...</p>
+                    </div>
+                  ) : quickPreviewError ? (
+                    <div className="text-center p-6 max-w-md">
+                      <AlertCircle className="w-12 h-12 text-amber-400 mx-auto mb-3" />
+                      <h4 className="text-sm font-bold text-slate-200 mb-1">تنبيه المعاينة المباشرة</h4>
+                      <p className="text-xs text-slate-400 mb-4">{quickPreviewError}</p>
+                      {quickPreviewAttachment && (
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadQuickAttachment(quickPreviewDoc.id, quickPreviewAttachment)}
+                          className="btn btn-primary btn-sm mx-auto flex items-center gap-1.5"
+                        >
+                          <Download size={14} />
+                          <span>تحميل الملف للاطلاع عليه محلياً</span>
+                        </button>
+                      )}
+                    </div>
+                  ) : quickPreviewBlobUrl ? (
+                    <div className="w-full h-full overflow-auto flex items-center justify-center p-2">
+                      {quickPreviewAttachment?.mime_type?.startsWith('image/') ||
+                       (quickPreviewAttachment?.file_name || '').match(/\.(jpg|jpeg|png|webp|gif|svg)$/i) ? (
+                        <img
+                          src={quickPreviewBlobUrl}
+                          alt="معاينة المرفق"
+                          className="max-w-full max-h-full object-contain transition-transform duration-200"
+                          style={{
+                            transform: `scale(${previewZoom}) rotate(${previewRotation}deg)`
+                          }}
+                        />
+                      ) : (
+                        <iframe
+                          src={quickPreviewBlobUrl}
+                          title="معاينة الملف"
+                          className="w-full h-full rounded border-0 bg-white"
+                        />
+                      )}
+                    </div>
+                  ) : quickPreviewAttachment && ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes((quickPreviewAttachment.file_name || '').split('.').pop()?.toLowerCase()) ? (
+                    <div className="text-center p-8 max-w-md space-y-3">
+                      <FileCheck className="w-14 h-14 text-blue-400 mx-auto" />
+                      <h4 className="text-sm font-bold text-white">مستند Office جاهز للاطلاع</h4>
+                      <p className="text-xs text-slate-400">
+                        هذا الملف بصيغة مكتبية ({quickPreviewAttachment.file_name?.split('.').pop()?.toUpperCase()}). يمكنك تنزيله ومراجعته على جهازك.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadQuickAttachment(quickPreviewDoc.id, quickPreviewAttachment)}
+                        className="btn btn-primary btn-sm flex items-center gap-2 mx-auto"
+                      >
+                        <Download size={14} />
+                        <span>تنزيل المستند</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center p-8 text-slate-400 space-y-2">
+                      <Layers className="w-12 h-12 text-slate-600 mx-auto" />
+                      <h4 className="text-sm font-bold text-slate-300">لا توجد ملفات مرفقة للمعاينة</h4>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                        يمكنك فتح صفحة الوثيقة الكاملة لإضافة ورفع المرفقات أو مراجعة سجل الحركات.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const docId = quickPreviewDoc.id;
+                          handleCloseQuickPreview();
+                          navigate(`/documents/${docId}`);
+                        }}
+                        className="btn btn-secondary btn-sm mt-2"
+                      >
+                        الانتقال لصفحة الوثيقة
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Sidebar Info & Attachments List */}
+              <div className="lg:col-span-4 p-4 overflow-y-auto space-y-4 bg-slate-900/70">
+                {/* Summary Metadata Card */}
+                <div className="glass p-3.5 space-y-3">
+                  <h3 className="text-xs font-bold text-slate-200 border-b border-white/5 pb-2">
+                    بيانات الأرشفة والحفظ
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-2.5 text-xs">
+                    <div>
+                      <span className="text-slate-500 text-[11px] block">تاريخ الوثيقة:</span>
+                      <span className="text-slate-200 font-mono">
+                        {quickPreviewDoc.document_date ? new Date(quickPreviewDoc.document_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' }) : '—'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-500 text-[11px] block">الحالة:</span>
+                      <span className="text-slate-200">
+                        {quickPreviewDoc.status?.label_ar || quickPreviewDoc.status?.name || '—'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-500 text-[11px] block">درجة السرية:</span>
+                      <span className="text-slate-200">
+                        {quickPreviewDoc.confidentiality_level?.label_ar || quickPreviewDoc.confidentiality_level?.name || 'داخلي'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-500 text-[11px] block">المُنشئ:</span>
+                      <span className="text-slate-200">
+                        {quickPreviewDoc.creator?.name || '—'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {quickPreviewDoc.physical_location && (
+                    <div className="pt-2 border-t border-white/5 text-xs">
+                      <span className="text-slate-500 text-[11px] block">موقع الحفظ الفيزيائي:</span>
+                      <span className="text-slate-300 font-mono text-[11px]">
+                        {quickPreviewDoc.physical_location}
+                      </span>
+                    </div>
+                  )}
+
+                  {quickPreviewDoc.description && (
+                    <div className="pt-2 border-t border-white/5 text-xs">
+                      <span className="text-slate-500 text-[11px] block">الوصف / البيان:</span>
+                      <p className="text-slate-300 text-[11px] mt-0.5 leading-relaxed line-clamp-3">
+                        {quickPreviewDoc.description}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Attachments List */}
+                <div className="glass p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                      <Layers size={13} className="text-blue-400" />
+                      <span>قائمة المرفقات</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300">
+                        {quickPreviewFull?.attachments?.length || 0}
+                      </span>
+                    </h3>
+                  </div>
+
+                  {quickPreviewLoading ? (
+                    <div className="py-4 text-center text-xs text-slate-500">
+                      جاري فحص المرفقات...
+                    </div>
+                  ) : quickPreviewFull?.attachments && quickPreviewFull.attachments.length > 0 ? (
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto no-scrollbar">
+                      {quickPreviewFull.attachments.map((att) => {
+                        const isSelected = quickPreviewAttachment?.id === att.id;
+                        return (
+                          <div
+                            key={att.id}
+                            onClick={() => handleSelectPreviewAttachment(quickPreviewDoc.id, att)}
+                            className={`p-2 rounded-xl text-xs flex items-center justify-between gap-2 cursor-pointer transition ${
+                              isSelected
+                                ? 'bg-blue-600/20 border border-blue-500/40 text-blue-200'
+                                : 'bg-slate-800/60 hover:bg-slate-800 text-slate-300 border border-transparent'
+                            }`}
+                          >
+                            <div className="min-w-0 flex items-center gap-2 truncate">
+                              <FileText size={14} className={isSelected ? 'text-blue-400' : 'text-slate-400'} />
+                              <div className="truncate">
+                                <p className="font-medium truncate">{att.file_name || att.original_name}</p>
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  {Math.round((att.file_size || 0) / 1024)} KB
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownloadQuickAttachment(quickPreviewDoc.id, att);
+                              }}
+                              className="p-1 rounded bg-slate-700/60 hover:bg-slate-700 text-slate-300 hover:text-white shrink-0"
+                              title="تنزيل"
+                            >
+                              <Download size={12} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-3 text-center text-xs text-slate-500">
+                      لا توجد مرفقات مرتبطة بهذه الوثيقة.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3.5 border-t border-slate-800 bg-slate-950/70 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={handleCloseQuickPreview}
+                className="btn btn-secondary btn-sm"
+              >
+                إغلاق
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const docId = quickPreviewDoc.id;
+                  handleCloseQuickPreview();
+                  navigate(`/documents/${docId}`);
+                }}
+                className="btn btn-primary btn-sm flex items-center gap-1.5"
+              >
+                <ExternalLink size={14} />
+                <span>فتح صفحة الوثيقة وسجل الحركات</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        window.document.body
       )}
 
       {/* Global Print Styles for Perfect Multi-page Output */}
