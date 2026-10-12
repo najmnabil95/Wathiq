@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import {
   LayoutDashboard, FolderOpen, FolderTree, Users, ShieldCheck,
   Settings, LogOut, Menu, X, Bell, Search, ChevronDown,
-  Archive, FileText, Activity, Shield, Building2
+  ChevronRight, ChevronLeft, Archive, FileText, Activity, Shield, Building2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -145,21 +145,42 @@ export default function AppLayout() {
           width: isMobile ? '272px' : (sidebarOpen ? '260px' : '72px'),
           transform: isMobile ? (sidebarOpen ? 'translateX(0)' : 'translateX(100%)') : 'translateX(0)',
           transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.28s cubic-bezier(0.4,0,0.2,1)',
-          overflow: 'hidden',
+          overflow: isMobile ? 'hidden' : 'visible',
           background: 'linear-gradient(180deg, rgba(8,13,28,0.98) 0%, rgba(5,8,18,0.99) 100%)',
           backdropFilter: 'blur(24px)',
           borderLeft: '1px solid rgba(255,255,255,0.07)',
           boxShadow: '0 0 60px rgba(0,0,0,0.4)',
         }}
       >
+        {/* Desktop Floating Edge Arrow Toggle */}
+        {!isMobile && (
+          <button
+            id="sidebar-edge-toggle"
+            onClick={() => setSidebarOpen(v => !v)}
+            className="absolute -left-3.5 top-5 w-7 h-7 rounded-full bg-slate-900 border border-white/20 hover:border-blue-400 hover:bg-slate-800 text-slate-300 hover:text-blue-400 shadow-xl flex items-center justify-center z-50 transition-all duration-200 press-effect group"
+            title={sidebarOpen ? 'طي القائمة الجانبية' : 'توسيع القائمة الجانبية'}
+            style={{
+              boxShadow: '0 2px 10px rgba(0,0,0,0.6)',
+            }}
+          >
+            {sidebarOpen ? (
+              <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+            ) : (
+              <ChevronLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
+            )}
+          </button>
+        )}
+
         {/* Logo Header */}
         <div
-          className="flex items-center justify-between px-4 shrink-0"
+          className="flex items-center justify-between px-3 sm:px-4 shrink-0"
           style={{ height: '66px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
         >
           <div className="flex items-center gap-3 min-w-0">
             <div
-              className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center"
+              className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer"
+              onClick={() => { if (!sidebarOpen && !isMobile) setSidebarOpen(true); }}
+              title={!sidebarOpen ? 'انقر لتوسيع القائمة' : undefined}
               style={{
                 background: 'linear-gradient(135deg, rgba(59,130,246,0.25), rgba(139,92,246,0.25))',
                 border: '1px solid rgba(59,130,246,0.35)',
@@ -179,6 +200,18 @@ export default function AppLayout() {
               </div>
             )}
           </div>
+
+          {/* Desktop Arrow Toggle inside Header */}
+          {!isMobile && sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all flex items-center justify-center"
+              title="طي القائمة الجانبية"
+            >
+              <ChevronRight size={16} />
+            </button>
+          )}
+
           {isMobile && (
             <button
               onClick={() => setSidebarOpen(false)}
@@ -277,16 +310,18 @@ export default function AppLayout() {
           }}
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            {/* Toggle Button */}
-            <button
-              id="sidebar-toggle"
-              onClick={() => setSidebarOpen(v => !v)}
-              className="btn btn-secondary btn-icon flex-shrink-0"
-              title={sidebarOpen ? 'تصغير القائمة' : 'توسيع القائمة'}
-              style={{ transition: 'all 0.18s ease' }}
-            >
-              <Menu size={17} />
-            </button>
+            {/* Mobile Toggle Button */}
+            {isMobile && (
+              <button
+                id="sidebar-toggle"
+                onClick={() => setSidebarOpen(v => !v)}
+                className="btn btn-secondary btn-icon flex-shrink-0"
+                title="فتح القائمة الجانبية"
+                style={{ transition: 'all 0.18s ease' }}
+              >
+                <Menu size={17} />
+              </button>
+            )}
 
             {/* Page Title */}
             <div className="min-w-0">
