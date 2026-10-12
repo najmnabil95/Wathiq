@@ -34,16 +34,28 @@ class AttachmentController extends Controller
 
         $document = Document::findOrFail($id);
 
-        $request->validate([
-            'files'   => ['required', 'array', 'min:1', 'max:10'],
-            'files.*' => ['required', 'file', 'max:20480'], // 20MB
-        ]);
+        if ($request->hasFile('file') && !$request->hasFile('files')) {
+            $request->validate([
+                'file' => ['required', 'file', 'max:20480'],
+            ]);
+            $files = [$request->file('file')];
+        } else {
+            $request->validate([
+                'files'   => ['required', 'array', 'min:1', 'max:10'],
+                'files.*' => ['required', 'file', 'max:20480'], // 20MB
+            ]);
+            $files = $request->file('files');
+        }
 
         $uploaded = [];
+        $description = $request->input('description');
 
-        foreach ($request->file('files') as $file) {
+        foreach ($files as $file) {
             try {
                 $attachment = $this->attachmentService->store($document, $file, $request->user()->id);
+                if ($description && !empty($description)) {
+                    $attachment->update(['description' => $description]);
+                }
                 $this->auditService->logDownload($document, $file->getClientOriginalName());
                 $uploaded[] = $attachment;
             } catch (\InvalidArgumentException $e) {
