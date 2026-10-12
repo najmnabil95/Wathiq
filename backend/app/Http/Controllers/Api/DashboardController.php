@@ -17,11 +17,11 @@ class DashboardController extends Controller
      */
     public function stats(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $request->user() ?? auth()->user();
 
         // Base query — super admin sees all, others see based on dept
         $baseQuery = Document::query();
-        if (!$user->isSuperAdmin() && !$user->hasRole('it_manager')) {
+        if ($user && !$user->isSuperAdmin() && !$user->hasRole('it_manager')) {
             $baseQuery->where('department_id', $user->department_id);
         }
 
@@ -45,13 +45,13 @@ class DashboardController extends Controller
             'highly_confidential'   => (clone $baseQuery)->whereHas('confidentialityLevel', fn($q) => $q->where('name', 'highly_confidential'))->count(),
 
             // Pending approvals for current user
-            'my_pending_approvals'  => Approval::where('approver_id', $user->id)->where('status', 'pending')->count(),
+            'my_pending_approvals'  => $user ? Approval::where('approver_id', $user->id)->where('status', 'pending')->count() : 0,
         ];
 
         // Documents by category
         $byCategory = (clone $baseQuery)
             ->join('categories', 'documents.category_id', '=', 'categories.id')
-            ->select('categories.name_ar', 'categories.name', 'categories.color', 'categories.icon', DB::raw('count(*) as total'))
+            ->select('categories.id', 'categories.name_ar', 'categories.name', 'categories.color', 'categories.icon', DB::raw('count(*) as total'))
             ->groupBy('categories.id', 'categories.name_ar', 'categories.name', 'categories.color', 'categories.icon')
             ->orderByDesc('total')
             ->limit(8)
@@ -60,21 +60,49 @@ class DashboardController extends Controller
         // Documents by month (last 12 months)
         $byMonth = DB::table('documents')
             ->select(
-                DB::raw('DATE_FORMAT(document_date, "%Y-%m") as month'),
+                DB::raw('DATE_FORMAT(COALESCE(document_date, created_at), "%Y-%m") as month'),
                 DB::raw('count(*) as total')
             )
             ->whereNull('deleted_at')
-            ->where('document_date', '>=', now()->subMonths(11)->startOfMonth())
+            ->where(DB::raw('COALESCE(document_date, created_at)'), '>=', now()->subMonths(11)->startOfMonth())
             ->groupBy('month')
             ->orderBy('month')
+            ->get();
+
+        // Documents by status
+        $byStatus = (clone $baseQuery)
+            ->join('statuses', 'documents.status_id', '=', 'statuses.id')
+            ->select('statuses.id', 'statuses.name', 'statuses.label_ar', 'statuses.color', DB::raw('count(*) as total'))
+            ->groupBy('statuses.id', 'statuses.name', 'statuses.label_ar', 'statuses.color')
+            ->orderByDesc('total')
+            ->get();
+
+        // Documents by department
+        $byDepartment = (clone $baseQuery)
+            ->join('departments', 'documents.department_id', '=', 'departments.id')
+            ->select('departments.id', 'departments.name_ar', 'departments.name', DB::raw('count(*) as total'))
+            ->groupBy('departments.id', 'departments.name_ar', 'departments.name')
+            ->orderByDesc('total')
+            ->limit(6)
+            ->get();
+
+        // Documents by confidentiality level
+        $byConfidentiality = (clone $baseQuery)
+            ->join('confidentiality_levels', 'documents.confidentiality_level_id', '=', 'confidentiality_levels.id')
+            ->select('confidentiality_levels.id', 'confidentiality_levels.name', 'confidentiality_levels.label_ar', 'confidentiality_levels.color', DB::raw('count(*) as total'))
+            ->groupBy('confidentiality_levels.id', 'confidentiality_levels.name', 'confidentiality_levels.label_ar', 'confidentiality_levels.color')
+            ->orderByDesc('total')
             ->get();
 
         return response()->json([
             'success' => true,
             'data'    => [
-                'stats'      => $stats,
-                'by_category'=> $byCategory,
-                'by_month'   => $byMonth,
+                'stats'             => $stats,
+                'by_category'       => $byCategory,
+                'by_month'          => $byMonth,
+                'by_status'         => $byStatus,
+                'by_department'     => $byDepartment,
+                'by_confidentiality'=> $byConfidentiality,
             ],
         ]);
     }
