@@ -145,81 +145,74 @@ export default function AppLayout() {
           width: isMobile ? '272px' : (sidebarOpen ? '260px' : '72px'),
           transform: isMobile ? (sidebarOpen ? 'translateX(0)' : 'translateX(100%)') : 'translateX(0)',
           transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.28s cubic-bezier(0.4,0,0.2,1)',
-          overflow: isMobile ? 'hidden' : 'visible',
+          overflow: 'hidden',
           background: 'linear-gradient(180deg, rgba(8,13,28,0.98) 0%, rgba(5,8,18,0.99) 100%)',
           backdropFilter: 'blur(24px)',
           borderLeft: '1px solid rgba(255,255,255,0.07)',
           boxShadow: '0 0 60px rgba(0,0,0,0.4)',
         }}
       >
-        {/* Desktop Floating Edge Arrow Toggle */}
-        {!isMobile && (
-          <button
-            id="sidebar-edge-toggle"
-            onClick={() => setSidebarOpen(v => !v)}
-            className="absolute -left-3.5 top-5 w-7 h-7 rounded-full bg-slate-900 border border-white/20 hover:border-blue-400 hover:bg-slate-800 text-slate-300 hover:text-blue-400 shadow-xl flex items-center justify-center z-50 transition-all duration-200 press-effect group"
-            title={sidebarOpen ? 'طي القائمة الجانبية' : 'توسيع القائمة الجانبية'}
-            style={{
-              boxShadow: '0 2px 10px rgba(0,0,0,0.6)',
-            }}
-          >
-            {sidebarOpen ? (
-              <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-            ) : (
-              <ChevronLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
-            )}
-          </button>
-        )}
-
-        {/* Logo Header */}
+        {/* Logo Header with Single Arrow Toggle */}
         <div
           className="flex items-center justify-between px-3 sm:px-4 shrink-0"
           style={{ height: '66px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
         >
-          <div className="flex items-center gap-3 min-w-0">
-            <div
-              className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer"
-              onClick={() => { if (!sidebarOpen && !isMobile) setSidebarOpen(true); }}
-              title={!sidebarOpen ? 'انقر لتوسيع القائمة' : undefined}
-              style={{
-                background: 'linear-gradient(135deg, rgba(59,130,246,0.25), rgba(139,92,246,0.25))',
-                border: '1px solid rgba(59,130,246,0.35)',
-                boxShadow: '0 0 20px rgba(59,130,246,0.15)',
-              }}
-            >
-              <Shield size={17} className="text-blue-400" />
-            </div>
-            {(sidebarOpen || isMobile) && (
-              <div className="animate-fade-in overflow-hidden min-w-0">
-                <div className="font-black text-white text-sm leading-tight tracking-wider" style={{ letterSpacing: '0.08em' }}>
-                  IT-EDMS
+          {sidebarOpen || isMobile ? (
+            <>
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59,130,246,0.25), rgba(139,92,246,0.25))',
+                    border: '1px solid rgba(59,130,246,0.35)',
+                    boxShadow: '0 0 20px rgba(59,130,246,0.15)',
+                  }}
+                >
+                  <Shield size={17} className="text-blue-400" />
                 </div>
-                <div className="text-[10px] leading-tight font-medium" style={{ color: '#45607a' }}>
-                  إدارة وأرشفة الوثائق
+                <div className="animate-fade-in overflow-hidden min-w-0">
+                  <div className="font-black text-white text-sm leading-tight tracking-wider" style={{ letterSpacing: '0.08em' }}>
+                    IT-EDMS
+                  </div>
+                  <div className="text-[10px] leading-tight font-medium" style={{ color: '#45607a' }}>
+                    إدارة وأرشفة الوثائق
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Desktop Arrow Toggle inside Header */}
-          {!isMobile && sidebarOpen && (
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all flex items-center justify-center"
-              title="طي القائمة الجانبية"
-            >
-              <ChevronRight size={16} />
-            </button>
-          )}
+              {!isMobile && (
+                <button
+                  id="sidebar-toggle-btn"
+                  onClick={() => setSidebarOpen(false)}
+                  className="w-7 h-7 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-white/10 hover:border-blue-500/40 text-slate-400 hover:text-white flex items-center justify-center transition-all press-effect mr-auto"
+                  title="طي القائمة الجانبية"
+                >
+                  <ChevronRight size={15} />
+                </button>
+              )}
 
-          {isMobile && (
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-all"
-              title="إغلاق القائمة"
-            >
-              <X size={17} />
-            </button>
+              {isMobile && (
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-all"
+                  title="إغلاق القائمة"
+                >
+                  <X size={17} />
+                </button>
+              )}
+            </>
+          ) : (
+            /* Collapsed State: Single arrow button to expand */
+            <div className="w-full flex items-center justify-center">
+              <button
+                id="sidebar-toggle-btn"
+                onClick={() => setSidebarOpen(true)}
+                className="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-blue-600/20 border border-white/10 hover:border-blue-500/50 text-slate-300 hover:text-blue-400 flex items-center justify-center transition-all press-effect group"
+                title="توسيع القائمة الجانبية"
+              >
+                <ChevronLeft size={17} className="group-hover:-translate-x-0.5 transition-transform" />
+              </button>
+            </div>
           )}
         </div>
 
