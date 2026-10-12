@@ -93,7 +93,16 @@ class AttachmentController extends Controller
             "File downloaded: {$attachment->original_name}"
         );
 
-        return Storage::disk($attachment->disk)->download(
+        $diskName = $attachment->disk ?: 'local';
+        $disk = Storage::disk($diskName);
+        if (!$disk->exists($attachment->file_path)) {
+            $fallback = ($diskName === 'private') ? 'local' : 'private';
+            if (Storage::disk($fallback)->exists($attachment->file_path)) {
+                $disk = Storage::disk($fallback);
+            }
+        }
+
+        return $disk->download(
             $attachment->file_path,
             $attachment->original_name
         );
@@ -108,21 +117,33 @@ class AttachmentController extends Controller
 
         $attachment = DocumentAttachment::where('document_id', $docId)->findOrFail($attId);
 
-        if (!$attachment->is_previewable) {
+        $diskName = $attachment->disk ?: 'local';
+        $disk = Storage::disk($diskName);
+        $filePath = $attachment->file_path;
+
+        if (!$disk->exists($filePath)) {
+            $fallback = ($diskName === 'private') ? 'local' : 'private';
+            if (Storage::disk($fallback)->exists($filePath)) {
+                $disk = Storage::disk($fallback);
+            } else if (file_exists(storage_path('app/' . $filePath))) {
+                $disk = Storage::disk('local');
+            } else {
+                return response()->json(['success' => false, 'message' => 'الملف غير موجود.'], 404);
+            }
+        }
+
+        if (!$attachment->is_previewable && !str_ends_with(strtolower($filePath), '.pdf')) {
             return response()->json([
                 'success' => false,
-                'message' => 'هذا النوع من الملفات لا يدعم المعاينة المباشرة.',
+                'message' => 'هذا النوع من الملفات مكتبي أو مضغوط ويتطلب التنزيل والتشغيل المكتبي.',
             ], 422);
         }
 
-        if (!Storage::disk($attachment->disk)->exists($attachment->file_path)) {
-            return response()->json(['success' => false, 'message' => 'الملف غير موجود.'], 404);
-        }
-
-        $fileContents = Storage::disk($attachment->disk)->get($attachment->file_path);
+        $fileContents = $disk->get($filePath);
+        $mime = $attachment->mime_type ?: 'application/pdf';
 
         return response($fileContents, 200)
-            ->header('Content-Type', $attachment->mime_type)
+            ->header('Content-Type', $mime)
             ->header('Content-Disposition', 'inline; filename="' . $attachment->original_name . '"')
             ->header('Content-Length', strlen($fileContents))
             ->header('Cache-Control', 'private, no-cache');

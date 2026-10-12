@@ -139,8 +139,24 @@ export default function DocumentDetailPage() {
     setPreviewError(null);
 
     if (previewBlobUrl) {
-      URL.revokeObjectURL(previewBlobUrl);
+      window.URL.revokeObjectURL(previewBlobUrl);
       setPreviewBlobUrl(null);
+    }
+
+    // Check if file is an Office / non-streamable document
+    const fileName = (att.file_name || att.original_name || '').toLowerCase();
+    const isOffice = /\.(docx?|xlsx?|pptx?|zip|rar)$/i.test(fileName) ||
+      (att.mime_type && (
+        att.mime_type.includes('wordprocessingml') ||
+        att.mime_type.includes('msword') ||
+        att.mime_type.includes('spreadsheetml') ||
+        att.mime_type.includes('excel') ||
+        att.mime_type.includes('presentationml')
+      ));
+
+    if (isOffice) {
+      setPreviewLoading(false);
+      return;
     }
 
     try {
@@ -148,7 +164,7 @@ export default function DocumentDetailPage() {
       const res = await attachmentsAPI.preview(id, att.id);
       const mime = att.mime_type || res.headers?.['content-type'] || 'application/pdf';
       const blob = new Blob([res.data], { type: mime });
-      const url = URL.createObjectURL(blob);
+      const url = window.URL.createObjectURL(blob);
       setPreviewBlobUrl(url);
     } catch (err) {
       console.error('Failed to preview file:', err);
@@ -161,7 +177,7 @@ export default function DocumentDetailPage() {
   const handleClosePreview = () => {
     setPreviewModalOpen(false);
     if (previewBlobUrl) {
-      URL.revokeObjectURL(previewBlobUrl);
+      window.URL.revokeObjectURL(previewBlobUrl);
       setPreviewBlobUrl(null);
     }
     setActivePreviewAttachment(null);
@@ -1333,16 +1349,25 @@ export default function DocumentDetailPage() {
                   </div>
                   <h4 className="text-sm font-bold text-white mb-2">تنبيه المعاينة المباشرة</h4>
                   <p className="text-xs text-slate-300 mb-5 leading-relaxed">{previewError}</p>
-                  {activePreviewAttachment && (
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+                    {activePreviewAttachment && (
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadAttachment(activePreviewAttachment.id, activePreviewAttachment.file_name || activePreviewAttachment.original_name)}
+                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold inline-flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                        تحميل الملف للاطلاع عليه محلياً
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => handleDownloadAttachment(activePreviewAttachment.id, activePreviewAttachment.file_name || activePreviewAttachment.original_name)}
-                      className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold inline-flex items-center gap-2 shadow-lg shadow-blue-600/20"
+                      onClick={() => { setActivePreviewAttachment(null); setPreviewError(null); }}
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 cursor-pointer"
                     >
-                      <Download className="w-4 h-4" />
-                      تحميل الملف للاطلاع عليه محلياً
+                      عرض البطاقة الرقمية
                     </button>
-                  )}
+                  </div>
                 </div>
               ) : activePreviewAttachment && previewBlobUrl ? (
                 /* PDF File */
