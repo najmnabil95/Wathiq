@@ -345,6 +345,34 @@ class DocumentController extends Controller
         return $this->index($request);
     }
 
+    // ─── Comments ─────────────────────────────────────────────────
+
+    public function addComment(Request $request, int $id): JsonResponse
+    {
+        $this->checkPermission('documents.view');
+
+        $validated = $request->validate([
+            'comment'   => ['required', 'string', 'max:2000'],
+            'parent_id' => ['nullable', 'integer', 'exists:comments,id'],
+        ]);
+
+        $document = Document::findOrFail($id);
+        $comment = $document->comments()->create([
+            'user_id'     => $request->user()->id,
+            'parent_id'   => $validated['parent_id'] ?? null,
+            'comment'     => $validated['comment'],
+            'is_internal' => true,
+        ]);
+
+        $this->auditService->log('comment', $document, null, ['comment_id' => $comment->id], "Added comment to document {$document->document_number}");
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم إضافة التعليق بنجاح.',
+            'data'    => $comment->load('user'),
+        ]);
+    }
+
     // ─── Helpers ─────────────────────────────────────────────────
 
     private function saveFieldValues(int $documentId, int $documentTypeId, array $fields): void

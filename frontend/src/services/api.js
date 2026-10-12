@@ -80,6 +80,7 @@ export const documentsAPI = {
   restore: (id)     => api.post(`/documents/${id}/restore`),
   approve: (id, data) => api.post(`/documents/${id}/approve`, data),
   reject:  (id, data) => api.post(`/documents/${id}/reject`, data),
+  addComment: (id, data) => api.post(`/documents/${id}/comments`, data),
   search:  (params) => api.get('/search', { params }),
 };
 

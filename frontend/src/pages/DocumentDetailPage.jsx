@@ -13,7 +13,7 @@ import {
   CheckCircle, XCircle, Archive, RotateCcw, Clock, Shield,
   Tag, Building2, Calendar, User, MapPin, Hash, QrCode,
   Printer, AlertCircle, FileCheck, Layers, ExternalLink, Edit3,
-  ZoomIn, ZoomOut, RotateCw, X
+  ZoomIn, ZoomOut, RotateCw, X, MessageSquare, GitBranch, Share2, Copy, Send, Check
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -76,6 +76,11 @@ export default function DocumentDetailPage() {
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadDescription, setUploadDescription] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+
+  // Comments and quick tools
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Document / Attachment Preview Modal State
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -330,6 +335,40 @@ export default function DocumentDetailPage() {
       fetchDocument();
     } catch (err) {
       toast.error(err.response?.data?.message || 'فشل حذف المرفق');
+    }
+  };
+
+  const handleAddComment = async (e) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+    try {
+      setSubmittingComment(true);
+      await documentsAPI.addComment(id, { comment: newComment.trim() });
+      toast.success('تمت إضافة الملاحظة الإدارية بنجاح');
+      setNewComment('');
+      fetchDocument();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'فشل إضافة الملاحظة');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleCopyShareLink = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(window.location.href);
+      setCopiedLink(true);
+      toast.success('تم نسخ رابط الوثيقة إلى الحافظة');
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
+  };
+
+  const handleDownloadAllAttachments = async () => {
+    if (!document?.attachments || document.attachments.length === 0) return;
+    toast.success(`جاري تنزيل ${document.attachments.length} ملفات...`);
+    for (const att of document.attachments) {
+      await handleDownloadAttachment(att.id, att.file_name || att.original_name);
+      await new Promise(r => setTimeout(r, 350));
     }
   };
 

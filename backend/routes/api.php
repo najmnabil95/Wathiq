@@ -59,6 +59,7 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
     Route::post  ('/documents/{id}/restore', [DocumentController::class, 'restore']);
     Route::post  ('/documents/{id}/approve', [DocumentController::class, 'approve']);
     Route::post  ('/documents/{id}/reject',  [DocumentController::class, 'reject']);
+    Route::post  ('/documents/{id}/comments',[DocumentController::class, 'addComment']);
 
     // Attachments
     Route::post  ('/documents/{id}/attachments',               [AttachmentController::class, 'store']);
