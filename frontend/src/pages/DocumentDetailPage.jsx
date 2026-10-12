@@ -295,10 +295,10 @@ export default function DocumentDetailPage() {
     try {
       const res = await attachmentsAPI.download(id, attId);
       const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
+      const link = window.document.createElement('a');
       link.href = url;
       link.setAttribute('download', fileName || 'attachment');
-      document.body.appendChild(link);
+      window.document.body.appendChild(link);
       link.click();
       link.remove();
     } catch (err) {
@@ -568,7 +568,7 @@ export default function DocumentDetailPage() {
               </p>
 
               {/* Dynamic Metadata Fields if any */}
-              {document.metadata_values && Object.keys(document.metadata_values).length > 0 && (
+              {document.metadata_values && typeof document.metadata_values === 'object' && !Array.isArray(document.metadata_values) && Object.keys(document.metadata_values).length > 0 && (
                 <div className="mt-6 pt-6 border-t border-slate-800">
                   <h4 className="text-sm font-semibold text-slate-300 mb-3">حقول البيانات المخصصة (Dynamic Metadata)</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1049,7 +1049,7 @@ export default function DocumentDetailPage() {
       )}
 
       {/* ── APPROVAL / REJECTION MODAL ──────────────────────────────── */}
-      {approvalModal.open && typeof document !== 'undefined' && createPortal(
+      {approvalModal.open && typeof window !== 'undefined' && window.document?.body && createPortal(
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md"
           style={{ direction: 'rtl', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
@@ -1111,11 +1111,11 @@ export default function DocumentDetailPage() {
             </div>
           </div>
         </div>,
-        document.body
+        window.document.body
       )}
 
       {/* ── EDIT DOCUMENT MODAL ──────────────────────────────────────── */}
-      {editModalOpen && typeof document !== 'undefined' && createPortal(
+      {editModalOpen && typeof window !== 'undefined' && window.document?.body && createPortal(
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md"
           style={{ direction: 'rtl', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
@@ -1192,11 +1192,11 @@ export default function DocumentDetailPage() {
             </form>
           </div>
         </div>,
-        document.body
+        window.document.body
       )}
 
       {/* ── INTERACTIVE DOCUMENT VIEWER MODAL ───────────────────────── */}
-      {previewModalOpen && typeof document !== 'undefined' && createPortal(
+      {previewModalOpen && typeof window !== 'undefined' && window.document?.body && createPortal(
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-5 bg-slate-950/90 backdrop-blur-md animate-fade-in text-right"
           style={{ direction: 'rtl' }}
@@ -1250,7 +1250,7 @@ export default function DocumentDetailPage() {
                 )}
 
                 {/* Zoom / Rotate Controls (for images) */}
-                {activePreviewAttachment && (activePreviewAttachment.mime_type?.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)$/i.test(activePreviewAttachment.file_name)) && (
+                {activePreviewAttachment && (activePreviewAttachment.mime_type?.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)$/i.test(activePreviewAttachment.file_name || activePreviewAttachment.original_name || '')) && (
                   <div className="hidden sm:flex items-center bg-slate-800/80 border border-slate-700 rounded-xl p-0.5">
                     <button
                       type="button"
@@ -1346,18 +1346,18 @@ export default function DocumentDetailPage() {
                 </div>
               ) : activePreviewAttachment && previewBlobUrl ? (
                 /* PDF File */
-                (activePreviewAttachment.mime_type?.includes('pdf') || activePreviewAttachment.file_name?.toLowerCase().endsWith('.pdf')) ? (
+                (activePreviewAttachment.mime_type?.includes('pdf') || (activePreviewAttachment.file_name || activePreviewAttachment.original_name || '').toLowerCase().endsWith('.pdf')) ? (
                   <iframe
                     src={previewBlobUrl}
                     className="w-full h-full rounded-2xl border border-slate-800 bg-white shadow-2xl"
                     title="معاينة ملف PDF"
                   />
                 ) : /* Image File */
-                (activePreviewAttachment.mime_type?.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)$/i.test(activePreviewAttachment.file_name)) ? (
+                (activePreviewAttachment.mime_type?.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)$/i.test(activePreviewAttachment.file_name || activePreviewAttachment.original_name || '')) ? (
                   <div className="w-full h-full flex items-center justify-center overflow-auto p-4">
                     <img
                       src={previewBlobUrl}
-                      alt={activePreviewAttachment.file_name}
+                      alt={activePreviewAttachment.file_name || activePreviewAttachment.original_name || 'preview'}
                       style={{
                         transform: `scale(${previewZoom}) rotate(${previewRotation}deg)`,
                         transition: 'transform 0.15s ease-out',
@@ -1366,7 +1366,7 @@ export default function DocumentDetailPage() {
                     />
                   </div>
                 ) : /* Text / Code / CSV */
-                (activePreviewAttachment.mime_type?.startsWith('text/') || /\.(txt|json|csv|log|xml)$/i.test(activePreviewAttachment.file_name)) ? (
+                (activePreviewAttachment.mime_type?.startsWith('text/') || /\.(txt|json|csv|log|xml)$/i.test(activePreviewAttachment.file_name || activePreviewAttachment.original_name || '')) ? (
                   <iframe
                     src={previewBlobUrl}
                     className="w-full h-full rounded-2xl border border-slate-800 bg-slate-900 text-slate-100 p-4 font-mono text-xs shadow-2xl"
@@ -1460,7 +1460,7 @@ export default function DocumentDetailPage() {
             </div>
           </div>
         </div>,
-        document.body
+        window.document.body
       )}
       </div>
 
