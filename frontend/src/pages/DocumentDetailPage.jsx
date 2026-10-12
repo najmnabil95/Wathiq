@@ -546,6 +546,15 @@ export default function DocumentDetailPage() {
               <QrCode className="w-4 h-4" />
               ملصق الباركود
             </button>
+
+            <button
+              onClick={handleCopyShareLink}
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs sm:text-sm font-medium transition cursor-pointer"
+              title="نسخ ومشاركة رابط الوثيقة"
+            >
+              {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4 text-blue-400" />}
+              <span className="hidden sm:inline">مشاركة</span>
+            </button>
           </div>
         </div>
 
@@ -572,6 +581,28 @@ export default function DocumentDetailPage() {
           >
             <Layers className="w-4 h-4" />
             المرفقات ({document.attachments?.length || 0})
+          </button>
+          <button
+            onClick={() => setActiveTab('versions')}
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition shrink-0 whitespace-nowrap ${
+              activeTab === 'versions'
+                ? 'border-blue-500 text-blue-400 bg-blue-500/5'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <GitBranch className="w-4 h-4 text-cyan-400" />
+            سجل الإصدارات ({document.versions?.length || 0})
+          </button>
+          <button
+            onClick={() => setActiveTab('comments')}
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition shrink-0 whitespace-nowrap ${
+              activeTab === 'comments'
+                ? 'border-blue-500 text-blue-400 bg-blue-500/5'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4 text-amber-400" />
+            الملاحظات والتعليقات ({document.comments?.length || 0})
           </button>
           <button
             onClick={() => setActiveTab('label')}
@@ -613,6 +644,105 @@ export default function DocumentDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Info */}
           <div className="lg:col-span-2 space-y-6">
+            {/* ── Workflow Lifecycle Stepper ── */}
+            <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-5 sm:p-6 backdrop-blur-md">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <GitBranch className="w-5 h-5 text-blue-400" />
+                  مسار دورة حياة الوثيقة والاعتماد
+                </h3>
+                <span className={`text-xs px-2.5 py-0.5 rounded-full border font-semibold ${statusColors[statusName] || statusColors.draft}`}>
+                  {statusLabel}
+                </span>
+              </div>
+
+              {/* Visual Stepper */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
+                {[
+                  {
+                    key: 'draft',
+                    label: 'إنشاء الوثيقة',
+                    sub: 'تسجيل مسودة مبدئية',
+                    done: true,
+                    active: statusName === 'draft',
+                  },
+                  {
+                    key: 'pending',
+                    label: 'المراجعة والتدقيق',
+                    sub: 'تحت تدقيق المسؤول',
+                    done: ['pending_approval', 'approved', 'archived'].includes(statusName),
+                    active: statusName === 'pending_approval',
+                  },
+                  {
+                    key: 'approval',
+                    label: statusName === 'rejected' ? 'مرفوضة إدارياً' : 'الاعتماد النهائي',
+                    sub: statusName === 'rejected' ? 'تم رفض الاعتماد' : 'إجازة وتوقيع رسمي',
+                    done: ['approved', 'archived', 'rejected'].includes(statusName),
+                    active: ['approved', 'rejected'].includes(statusName),
+                    rejected: statusName === 'rejected',
+                  },
+                  {
+                    key: 'archived',
+                    label: 'الحفظ والأرشفة',
+                    sub: 'أرشفة دائمة مشفرة',
+                    done: statusName === 'archived',
+                    active: statusName === 'archived',
+                  },
+                ].map((step, idx) => (
+                  <div
+                    key={step.key}
+                    className={`p-3 rounded-xl border text-center transition ${
+                      step.rejected
+                        ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                        : step.active
+                        ? 'bg-blue-500/15 border-blue-500/40 text-blue-300 shadow-sm'
+                        : step.done
+                        ? 'bg-slate-950/40 border-emerald-500/30 text-emerald-400'
+                        : 'bg-slate-950/20 border-slate-800/60 text-slate-500'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-1.5 mb-1">
+                      <span className="w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center font-mono bg-white/10">
+                        {step.done ? '✓' : idx + 1}
+                      </span>
+                      <span className="text-xs font-bold">{step.label}</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 block truncate">{step.sub}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Approvals History if any */}
+              {document.approvals && document.approvals.length > 0 && (
+                <div className="mt-5 pt-4 border-t border-slate-800">
+                  <h4 className="text-xs font-bold text-slate-300 mb-2">سجل قرارات وملاحظات الاعتماد:</h4>
+                  <div className="divide-y divide-slate-800/80 rounded-xl border border-slate-800 overflow-hidden text-xs">
+                    {document.approvals.map((app) => (
+                      <div key={app.id} className="p-3 bg-slate-950/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                            app.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                            app.status === 'rejected' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
+                            'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          }`}>
+                            {app.status === 'approved' ? 'معتمد' : app.status === 'rejected' ? 'مرفوض' : 'قيد النظر'}
+                          </span>
+                          <span className="font-semibold text-white">{app.approver?.name || 'المعتمد'}</span>
+                          {app.workflow_step && <span className="text-slate-400 font-mono">({app.workflow_step.name})</span>}
+                        </div>
+                        <div className="flex items-center gap-3 text-slate-400">
+                          {app.comments && <span className="text-slate-300 italic">"{app.comments}"</span>}
+                          <span className="font-mono text-[11px]" style={{ direction: 'ltr' }}>
+                            {app.approved_at ? new Date(app.approved_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : ''}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-6 backdrop-blur-md">
               <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
                 <FileCheck className="w-5 h-5 text-blue-400" />
@@ -727,6 +857,30 @@ export default function DocumentDetailPage() {
                   {document.created_at ? new Date(document.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' }) : '—'}
                 </span>
               </div>
+
+              {document.original_number && (
+                <div className="flex items-center justify-between text-sm pt-3 border-t border-slate-800">
+                  <span className="text-slate-400 flex items-center gap-2">
+                    <Hash className="w-4 h-4 text-blue-400" />
+                    رقم القيد الأصلي
+                  </span>
+                  <span className="font-mono font-bold text-slate-200">{document.original_number}</span>
+                </div>
+              )}
+
+              {/* Tags & Keywords */}
+              {document.tags && document.tags.length > 0 && (
+                <div className="pt-3 border-t border-slate-800">
+                  <span className="text-xs text-slate-400 block mb-2 font-medium">الوسوم والكلمات الدلالية:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {document.tags.map((tag) => (
+                      <span key={tag.id} className="text-[11px] px-2.5 py-0.5 rounded-lg bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                        #{tag.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Security Notice */}
@@ -782,8 +936,21 @@ export default function DocumentDetailPage() {
           {/* List of Attachments */}
           <div className="bg-slate-900/60 rounded-2xl border border-slate-800 overflow-hidden backdrop-blur-md">
             <div className="p-4 border-b border-slate-800 font-bold text-white flex items-center justify-between">
-              <span>المرفقات الحالية</span>
-              <span className="text-xs font-mono text-slate-400">الإجمالي: {document.attachments?.length || 0}</span>
+              <div className="flex items-center gap-3">
+                <span>المرفقات الحالية</span>
+                <span className="text-xs font-mono text-slate-400">الإجمالي: {document.attachments?.length || 0}</span>
+              </div>
+              {document.attachments && document.attachments.length > 1 && (
+                <button
+                  type="button"
+                  onClick={handleDownloadAllAttachments}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/30 text-xs font-semibold transition cursor-pointer"
+                  title="تحميل جميع الملفات المرفقة دفعة واحدة"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>تحميل كافة المرفقات</span>
+                </button>
+              )}
             </div>
 
             {(!document.attachments || document.attachments.length === 0) ? (
@@ -840,6 +1007,152 @@ export default function DocumentDetailPage() {
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: VERSIONS ─────────────────────────────────────────── */}
+      {activeTab === 'versions' && (
+        <div className="bg-slate-900/60 rounded-2xl border border-slate-800 overflow-hidden backdrop-blur-md">
+          <div className="p-4 border-b border-slate-800 font-bold text-white flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <GitBranch className="w-5 h-5 text-cyan-400" />
+              سجل إصدارات وتحديثات الوثيقة (Version History)
+            </span>
+            <span className="text-xs font-mono text-slate-400">الإصدارات: {document.versions?.length || 1}</span>
+          </div>
+
+          <div className="p-6">
+            <div className="relative border-r-2 border-slate-800 pr-6 mr-3 space-y-6">
+              {/* Current Version */}
+              <div className="relative">
+                <span className="absolute -right-[31px] top-1 w-4 h-4 rounded-full bg-emerald-500 ring-4 ring-slate-900" />
+                <div className="bg-slate-950/60 border border-emerald-500/30 rounded-2xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">
+                        الإصدار الحالي v{document.versions && document.versions.length > 0 ? (document.versions.length + 1).toFixed(1) : '1.0'}
+                      </span>
+                      <span className="text-xs text-slate-300 font-semibold">{document.title}</span>
+                    </div>
+                    <span className="text-xs text-slate-400 font-mono" style={{ direction: 'ltr' }}>
+                      {document.created_at ? new Date(document.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' }) : '—'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    هذا هو الإصدار المعتمد والنشط حالياً على النظام. تم التوثيق بواسطة: <span className="text-slate-200 font-medium">{document.creator?.name || 'المسؤول'}</span>.
+                  </p>
+                </div>
+              </div>
+
+              {/* Historical Versions if any */}
+              {document.versions && document.versions.length > 0 ? (
+                document.versions.map((ver, idx) => (
+                  <div key={ver.id} className="relative">
+                    <span className="absolute -right-[31px] top-1 w-4 h-4 rounded-full bg-blue-500/80 ring-4 ring-slate-900" />
+                    <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-4">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded bg-blue-500/15 text-blue-300 text-xs font-mono font-bold">
+                            v{ver.version_number || (idx + 1).toFixed(1)}
+                          </span>
+                          <span className="text-xs font-bold text-white">{ver.file_name || 'تعديل وثائقي'}</span>
+                        </div>
+                        <span className="text-xs text-slate-400 font-mono" style={{ direction: 'ltr' }}>
+                          {ver.created_at ? new Date(ver.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' }) : '—'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mb-2">{ver.change_summary || 'تحديث أولي للبيانات والمرفقات.'}</p>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-900">
+                        <span>بواسطة: {ver.uploader?.name || 'المسؤول'}</span>
+                        <span className="font-mono">{ver.file_size ? `${(ver.file_size / 1024).toFixed(1)} KB` : ''}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-slate-500 p-3 bg-slate-950/30 rounded-xl border border-slate-800/60">
+                  لا توجد تعديلات أو إصدارات سابقة؛ الوثيقة ما زالت بإصدارها الأصلي المعتمد.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: COMMENTS & ADMINISTRATIVE NOTES ──────────────────── */}
+      {activeTab === 'comments' && (
+        <div className="space-y-6">
+          {/* Add Comment Box */}
+          <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-6 backdrop-blur-md">
+            <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-amber-400" />
+              إضافة توجيه أو ملاحظة إدارية
+            </h3>
+            <form onSubmit={handleAddComment} className="space-y-3">
+              <textarea
+                rows={3}
+                placeholder="اكتب توجيهاتك أو ملاحظاتك الإدارية حول هذه الوثيقة..."
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 resize-none transition"
+              />
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={submittingComment || !newComment.trim()}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition shadow-lg shadow-blue-600/20 disabled:opacity-50 cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  {submittingComment ? 'جاري الإرسال...' : 'إرسال الملاحظة'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Comments List */}
+          <div className="bg-slate-900/60 rounded-2xl border border-slate-800 overflow-hidden backdrop-blur-md">
+            <div className="p-4 border-b border-slate-800 font-bold text-white flex items-center justify-between">
+              <span>الملاحظات والتعليقات المسجلة</span>
+              <span className="text-xs font-mono text-slate-400">الإجمالي: {document.comments?.length || 0}</span>
+            </div>
+
+            {(!document.comments || document.comments.length === 0) ? (
+              <div className="p-12 text-center text-slate-500">
+                <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>لا توجد ملاحظات أو توجيهات إدارية مسجلة لهذه الوثيقة حتى الآن.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-800/80">
+                {document.comments.map((comm) => (
+                  <div key={comm.id} className="p-5 flex items-start gap-3.5">
+                    <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                      {comm.user?.name ? comm.user.name.charAt(0).toUpperCase() : 'U'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-white">{comm.user?.name || 'مستخدم النظام'}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">ملاحظة داخلية</span>
+                        </div>
+                        <span className="text-xs text-slate-400 font-mono" style={{ direction: 'ltr' }}>
+                          {comm.created_at ? new Date(comm.created_at).toLocaleString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : ''}
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed whitespace-pre-line bg-slate-950/40 p-3 rounded-xl border border-slate-800/60">
+                        {comm.comment}
+                      </p>
                     </div>
                   </div>
                 ))}
