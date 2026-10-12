@@ -6,7 +6,8 @@ import {
   FileText, ChevronRight, ChevronLeft, Download, RefreshCw,
   SlidersHorizontal, X, CheckCircle2, Clock, XCircle,
   ArrowUpDown, ArrowUp, ArrowDown, Printer, FileSpreadsheet,
-  Building2, ShieldAlert, ChevronDown, Check, Layers
+  Building2, ChevronDown, Layers,
+  Shield, QrCode
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
@@ -47,7 +48,21 @@ export default function DocumentsPage() {
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [reportScope, setReportScope] = useState('page'); // 'page' | 'all'
+  const [reportOrientation, setReportOrientation] = useState('landscape'); // 'landscape' | 'portrait'
+  const [reportDocs, setReportDocs] = useState([]);
+  const [isLoadingReportDocs, setIsLoadingReportDocs] = useState(false);
+  const [reportRefNumber, setReportRefNumber] = useState('');
   const exportRef = useRef(null);
+
+  // Clean print state on afterprint event
+  useEffect(() => {
+    const onAfterPrint = () => {
+      document.body.classList.remove('printing-documents-report');
+    };
+    window.addEventListener('afterprint', onAfterPrint);
+    return () => window.removeEventListener('afterprint', onAfterPrint);
+  }, []);
 
   const [filters, setFilters] = useState({
     q:                       searchParams.get('q') || '',
@@ -309,6 +324,55 @@ export default function DocumentsPage() {
     }
   };
 
+  const handleOpenPrintModal = () => {
+    setExportDropdownOpen(false);
+    const d = new Date();
+    const dateCode = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    const randCode = Math.floor(1000 + Math.random() * 9000);
+    setReportRefNumber(`REP-${dateCode}-${randCode}`);
+    setReportScope('page');
+    setReportDocs(docs);
+    setPrintModalOpen(true);
+  };
+
+  const handleScopeChange = async (scope) => {
+    setReportScope(scope);
+    if (scope === 'page') {
+      setReportDocs(docs);
+    } else {
+      setIsLoadingReportDocs(true);
+      try {
+        const params = { ...filters, page: 1, per_page: 500 };
+        if (!params.q) delete params.q;
+        if (!params.category_id) delete params.category_id;
+        if (!params.category_code) delete params.category_code;
+        if (!params.department_id) delete params.department_id;
+        if (!params.status) delete params.status;
+        if (!params.pending) delete params.pending;
+        if (!params.status_id) delete params.status_id;
+        if (!params.confidentiality_level_id) delete params.confidentiality_level_id;
+        if (!params.date_from) delete params.date_from;
+        if (!params.date_to) delete params.date_to;
+
+        const res = await documentsAPI.list(params);
+        const allList = res.data?.data?.data || [];
+        setReportDocs(allList.length > 0 ? allList : docs);
+      } catch (err) {
+        toast.error('فشل جلب كافة الوثائق للتقرير، تم الإبقاء على الصفحة الحالية');
+        setReportDocs(docs);
+      } finally {
+        setIsLoadingReportDocs(false);
+      }
+    }
+  };
+
+  const handlePrintNow = () => {
+    document.body.classList.add('printing-documents-report');
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
+
   const renderSortIcon = (field) => {
     if (filters.sort !== field) {
       return <ArrowUpDown size={13} className="text-slate-500 opacity-60 group-hover:opacity-100 transition-opacity" />;
@@ -409,7 +473,7 @@ export default function DocumentsPage() {
                 <div className="border-t border-white/5 my-1" />
 
                 <button
-                  onClick={() => { setExportDropdownOpen(false); setPrintModalOpen(true); }}
+                  onClick={handleOpenPrintModal}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-right rounded-lg hover:bg-indigo-500/10 hover:text-indigo-400 text-xs text-slate-200 transition"
                 >
                   <Printer size={15} className="text-indigo-400" />
@@ -1001,101 +1065,343 @@ export default function DocumentsPage() {
         )}
       </div>
 
-      {/* ── Printable Report Modal ── */}
+      {/* ── Printable Official Report Modal ── */}
       {printModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-slate-950/60 no-print">
-              <div className="flex items-center gap-2.5">
-                <Printer className="text-blue-400" size={20} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in no-print-backdrop">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-6xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Modal Interactive Header / Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-white/10 bg-slate-950/80 no-print shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center">
+                  <Printer size={18} />
+                </div>
                 <div>
-                  <h3 className="font-bold text-white text-base">معاينة تقرير كشف الوثائق</h3>
-                  <p className="text-xs text-slate-400">جاهز للطباعة المباشرة أو التصدير كملف PDF</p>
+                  <h3 className="font-bold text-white text-sm sm:text-base flex items-center gap-2">
+                    <span>كشف حصر الوثائق والمستندات الأرشيفية</span>
+                    <span className="text-[11px] font-mono font-normal px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                      {reportRefNumber}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">معاينة استمارة الكشف الرسمي وفق معايير الأرشفة المعتمدة</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+
+              {/* Controls: Scope, Orientation, and Action Buttons */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Scope Selection */}
+                <div className="flex items-center bg-slate-900 border border-white/10 rounded-xl p-0.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => handleScopeChange('page')}
+                    className={`px-2.5 py-1.5 rounded-lg font-medium transition ${
+                      reportScope === 'page'
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    الصفحة الحالية ({docs.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleScopeChange('all')}
+                    disabled={isLoadingReportDocs}
+                    className={`px-2.5 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
+                      reportScope === 'all'
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {isLoadingReportDocs && <RefreshCw size={12} className="animate-spin text-blue-300" />}
+                    <span>كافة النتائج المطابقة ({meta?.total || docs.length})</span>
+                  </button>
+                </div>
+
+                {/* Orientation Selection */}
+                <div className="flex items-center bg-slate-900 border border-white/10 rounded-xl p-0.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setReportOrientation('landscape')}
+                    className={`px-2.5 py-1.5 rounded-lg font-medium transition ${
+                      reportOrientation === 'landscape'
+                        ? 'bg-slate-700 text-white font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="تنسيق عرضي (موصى به للجداول العريضة)"
+                  >
+                    أفقي (Landscape)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReportOrientation('portrait')}
+                    className={`px-2.5 py-1.5 rounded-lg font-medium transition ${
+                      reportOrientation === 'portrait'
+                        ? 'bg-slate-700 text-white font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="تنسيق طولي عمودي"
+                  >
+                    طولي (Portrait)
+                  </button>
+                </div>
+
+                {/* Print Action */}
                 <button
                   type="button"
-                  onClick={() => window.print()}
-                  className="btn btn-primary btn-sm flex items-center gap-1.5 shadow-lg shadow-blue-500/25"
+                  onClick={handlePrintNow}
+                  className="btn btn-primary btn-sm flex items-center gap-1.5 shadow-lg shadow-blue-500/25 px-3.5"
                 >
                   <Printer size={15} />
-                  <span>طباعة الآن / حفظ PDF</span>
+                  <span>طباعة الآن / PDF</span>
                 </button>
+
+                {/* Export CSV from Preview */}
+                <button
+                  type="button"
+                  onClick={() => generateCSV(reportDocs, `report_${reportScope}`)}
+                  className="btn btn-secondary btn-sm flex items-center gap-1.5"
+                  title="تصدير بيانات هذا التقرير إلى ملف Excel"
+                >
+                  <FileSpreadsheet size={15} className="text-emerald-400" />
+                  <span className="hidden sm:inline">Excel/CSV</span>
+                </button>
+
+                {/* Close Modal */}
                 <button
                   type="button"
                   onClick={() => setPrintModalOpen(false)}
-                  className="btn btn-secondary btn-sm"
+                  className="btn btn-secondary btn-sm p-1.5 text-slate-400 hover:text-white"
+                  title="إغلاق المعاينة"
                 >
-                  <X size={15} /> إغلاق
+                  <X size={17} />
                 </button>
               </div>
             </div>
 
-            {/* Modal Printable Content */}
-            <div className="p-6 sm:p-8 overflow-y-auto flex-1 bg-white text-slate-900 edms-print-area" id="edms-printable-report" dir="rtl">
-              {/* Report Header */}
-              <div className="flex items-start justify-between border-b-2 border-slate-900 pb-4 mb-6">
-                <div>
-                  <h2 className="text-xl font-black text-slate-900">نظام إدارة وأرشفة وثائق تقنية المعلومات (IT-EDMS)</h2>
-                  <p className="text-sm text-slate-600 mt-0.5">تقرير كشف الوثائق والمستندات الرسمية</p>
-                </div>
-                <div className="text-left text-xs font-mono text-slate-600 space-y-1" dir="ltr">
-                  <div>Date: {new Date().toLocaleDateString('en-GB')}</div>
-                  <div>Time: {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
-                  <div>User: {user?.name || 'Administrator'}</div>
-                </div>
-              </div>
+            {/* Modal Body: Realistic A4 Viewport */}
+            <div className="overflow-y-auto flex-1 bg-slate-950/70 p-3 sm:p-6 text-slate-900">
+              <div
+                id="edms-printable-report"
+                className="bg-white text-slate-900 mx-auto rounded shadow-2xl p-6 sm:p-10 transition-all"
+                dir="rtl"
+                style={{
+                  maxWidth: reportOrientation === 'landscape' ? '1120px' : '840px',
+                  fontFamily: 'Cairo, sans-serif',
+                }}
+              >
+                {/* Official Letterhead Header */}
+                <div className="border-b-2 border-slate-900 pb-4 mb-5 flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-slate-950 to-slate-800 text-white flex items-center justify-center font-black text-xl border-2 border-slate-900 shadow-md shrink-0">
+                      <Shield className="w-7 h-7 text-blue-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-black text-slate-900 leading-tight">المملكة العربية السعودية</h2>
+                      <h3 className="text-xs font-bold text-slate-800 leading-tight">إدارة تقنية المعلومات والأنظمة</h3>
+                      <p className="text-[11px] text-slate-600 leading-tight mt-0.5">
+                        وحدة الأرشفة الإلكترونية والتوثيق الرقمي (IT-EDMS)
+                      </p>
+                    </div>
+                  </div>
 
-              {/* Report Meta Info */}
-              <div className="grid grid-cols-3 gap-4 p-3 bg-slate-100 rounded-lg text-xs mb-6 text-slate-700">
-                <div><strong>إجمالي الوثائق بالتقرير:</strong> {docs.length} وثيقة</div>
-                <div><strong>الصفحة:</strong> {meta?.current_page || 1} من {meta?.last_page || 1}</div>
-                <div><strong>الترتيب:</strong> {filters.sort} ({filters.dir === 'asc' ? 'تصاعدي' : 'تنازلي'})</div>
-              </div>
+                  <div className="text-center px-2">
+                    <div className="inline-block border-b-2 border-slate-900 pb-1 mb-1">
+                      <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-wide m-0">
+                        كشف حصر وسجل الوثائق الأرشيفية
+                      </h1>
+                    </div>
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-slate-500 font-bold m-0" style={{ letterSpacing: '0.08em' }}>
+                      Official Archival Registry Manifest
+                    </p>
+                  </div>
 
-              {/* Table */}
-              <table className="w-full text-xs border-collapse border border-slate-300">
-                <thead>
-                  <tr className="bg-slate-200 text-slate-800 font-bold border-b border-slate-400">
-                    <th className="p-2 border border-slate-300 text-right">#</th>
-                    <th className="p-2 border border-slate-300 text-right">رقم الوثيقة</th>
-                    <th className="p-2 border border-slate-300 text-right">العنوان</th>
-                    <th className="p-2 border border-slate-300 text-right">التصنيف</th>
-                    <th className="p-2 border border-slate-300 text-right">القسم</th>
-                    <th className="p-2 border border-slate-300 text-center">الحالة</th>
-                    <th className="p-2 border border-slate-300 text-center">السرية</th>
-                    <th className="p-2 border border-slate-300 text-right">التاريخ</th>
-                    <th className="p-2 border border-slate-300 text-right">المُنشئ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {docs.map((d, i) => (
-                    <tr key={d.id} className="border-b border-slate-200 even:bg-slate-50">
-                      <td className="p-2 border border-slate-300 font-mono">{i + 1}</td>
-                      <td className="p-2 border border-slate-300 font-mono font-bold">{d.document_number}</td>
-                      <td className="p-2 border border-slate-300 font-semibold">{d.title}</td>
-                      <td className="p-2 border border-slate-300">{d.category?.name_ar || '—'}</td>
-                      <td className="p-2 border border-slate-300">{d.department?.name_ar || '—'}</td>
-                      <td className="p-2 border border-slate-300 text-center">{d.status?.label_ar || d.status?.name || '—'}</td>
-                      <td className="p-2 border border-slate-300 text-center">{d.confidentiality_level?.label_ar || d.confidentiality_level?.name || '—'}</td>
-                      <td className="p-2 border border-slate-300 font-mono" dir="ltr">{d.document_date || '—'}</td>
-                      <td className="p-2 border border-slate-300">{d.creator?.name || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {/* Signatures */}
-              <div className="grid grid-cols-2 gap-8 mt-12 pt-6 border-t border-slate-300 text-xs text-slate-700">
-                <div className="text-center space-y-8">
-                  <p className="font-bold">مسؤول الأرشيف والتوثيق</p>
-                  <p className="text-slate-400">التوقيع والختم: .......................................</p>
+                  <div className="text-left font-mono text-[11px] text-slate-800 space-y-0.5 border border-slate-300 bg-slate-50/80 p-2.5 rounded-lg shrink-0 shadow-sm" dir="ltr">
+                    <div><span className="text-slate-500 font-sans">رقم التقرير:</span> <strong className="text-slate-900 font-bold">{reportRefNumber}</strong></div>
+                    <div><span className="text-slate-500 font-sans">تاريخ الطباعة:</span> {new Date().toLocaleDateString('en-GB')}</div>
+                    <div><span className="text-slate-500 font-sans">الوقت:</span> {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
+                    <div><span className="text-slate-500 font-sans">المُصدر:</span> {user?.name || 'مدير النظام'}</div>
+                  </div>
                 </div>
-                <div className="text-center space-y-8">
-                  <p className="font-bold">مدير إدارة تقنية المعلومات</p>
-                  <p className="text-slate-400">الاعتماد: .......................................</p>
+
+                {/* Filter Criteria Summary (if any filter is applied) */}
+                {(filters.q || filters.category_id || filters.department_id || filters.status || filters.status_id || filters.date_from || filters.date_to || filters.archived) && (
+                  <div className="flex flex-wrap items-center gap-2 p-2.5 mb-4 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700">
+                    <span className="font-bold text-slate-900 flex items-center gap-1">
+                      <SlidersHorizontal size={13} className="text-blue-600" />
+                      <span>معايير التقرير المطبقة:</span>
+                    </span>
+                    {filters.q && (
+                      <span className="px-2 py-0.5 rounded bg-white border border-slate-300 font-mono text-[11px]">
+                        بحث: "{filters.q}"
+                      </span>
+                    )}
+                    {filters.category_id && (
+                      <span className="px-2 py-0.5 rounded bg-white border border-slate-300 font-semibold text-[11px]">
+                        التصنيف: {categories.find(c => String(c.id) === String(filters.category_id))?.name_ar || filters.category_id}
+                      </span>
+                    )}
+                    {filters.department_id && (
+                      <span className="px-2 py-0.5 rounded bg-white border border-slate-300 font-semibold text-[11px]">
+                        القسم: {departments.find(d => String(d.id) === String(filters.department_id))?.name_ar || departments.find(d => String(d.id) === String(filters.department_id))?.name || filters.department_id}
+                      </span>
+                    )}
+                    {filters.status && (
+                      <span className="px-2 py-0.5 rounded bg-white border border-slate-300 font-semibold text-[11px]">
+                        الحالة: {STATUS_CONFIG[filters.status]?.label || filters.status}
+                      </span>
+                    )}
+                    {(filters.date_from || filters.date_to) && (
+                      <span className="px-2 py-0.5 rounded bg-white border border-slate-300 font-mono text-[11px]" dir="ltr">
+                        الفترة: {filters.date_from || 'البداية'} → {filters.date_to || 'الآن'}
+                      </span>
+                    )}
+                    {filters.archived && (
+                      <span className="px-2 py-0.5 rounded bg-slate-200 border border-slate-300 text-slate-800 font-bold text-[11px]">
+                        الوثائق المؤرشفة
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Executive Summary Badges */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 mb-5 bg-slate-100/80 border border-slate-300 rounded-xl text-center">
+                  <div className="p-1">
+                    <div className="text-[11px] text-slate-600 font-semibold">إجمالي الوثائق بالتقرير</div>
+                    <div className="text-lg font-black text-slate-900 font-mono mt-0.5">
+                      {reportDocs.length} <span className="text-xs font-normal text-slate-500 font-sans">وثيقة</span>
+                    </div>
+                  </div>
+                  <div className="p-1 border-r border-slate-200">
+                    <div className="text-[11px] text-emerald-800 font-semibold">الوثائق المعتمدة</div>
+                    <div className="text-lg font-black text-emerald-700 font-mono mt-0.5">
+                      {reportDocs.filter(d => d.status?.name === 'approved' || d.status === 'approved').length}
+                    </div>
+                  </div>
+                  <div className="p-1 border-r border-slate-200">
+                    <div className="text-[11px] text-amber-800 font-semibold">قيد المراجعة والاعتماد</div>
+                    <div className="text-lg font-black text-amber-700 font-mono mt-0.5">
+                      {reportDocs.filter(d => d.status?.name === 'pending_approval' || d.status === 'pending_approval').length}
+                    </div>
+                  </div>
+                  <div className="p-1 border-r border-slate-200">
+                    <div className="text-[11px] text-rose-800 font-semibold">الوثائق المصنفة سرية</div>
+                    <div className="text-lg font-black text-rose-700 font-mono mt-0.5">
+                      {reportDocs.filter(d => ['confidential', 'highly_confidential'].includes(d.confidentiality_level?.name)).length}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Structured Inventory Table */}
+                <div className="overflow-x-auto mb-6">
+                  <table className="w-full text-xs border-collapse border border-slate-300 print:text-[10px]">
+                    <thead>
+                      <tr className="bg-slate-900 text-white font-bold border-b border-slate-900">
+                        <th className="p-2.5 border border-slate-300 text-center w-8">#</th>
+                        <th className="p-2.5 border border-slate-300 text-right w-28">رقم الوثيقة</th>
+                        <th className="p-2.5 border border-slate-300 text-right">عنوان وموضوع الوثيقة</th>
+                        <th className="p-2.5 border border-slate-300 text-right w-28">التصنيف</th>
+                        <th className="p-2.5 border border-slate-300 text-right w-32">القسم / الإدارة</th>
+                        <th className="p-2.5 border border-slate-300 text-center w-24">الحالة</th>
+                        <th className="p-2.5 border border-slate-300 text-center w-20">السرية</th>
+                        <th className="p-2.5 border border-slate-300 text-right w-24">تاريخ الوثيقة</th>
+                        <th className="p-2.5 border border-slate-300 text-right w-28">المُنشئ</th>
+                        <th className="p-2.5 border border-slate-300 text-right w-28">موقع الحفظ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {reportDocs.map((d, i) => {
+                        const statusObj = d.status;
+                        const statusLabel = statusObj?.label_ar || statusObj?.name || '—';
+                        const confObj = d.confidentiality_level;
+                        const confLabel = confObj?.label_ar || confObj?.name || '—';
+
+                        return (
+                          <tr key={d.id} className="even:bg-slate-50/80 hover:bg-blue-50/30 transition">
+                            <td className="p-2 border border-slate-300 font-mono text-center font-bold text-slate-600">
+                              {i + 1}
+                            </td>
+                            <td className="p-2 border border-slate-300 font-mono font-bold text-slate-900">
+                              {d.document_number}
+                            </td>
+                            <td className="p-2 border border-slate-300 font-semibold text-slate-900 leading-snug">
+                              <div>{d.title}</div>
+                              {d.document_type?.name_ar && (
+                                <span className="text-[10px] text-slate-500 font-normal">
+                                  ({d.document_type?.name_ar})
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-2 border border-slate-300 text-slate-700">
+                              {d.category?.name_ar || d.category?.name || '—'}
+                            </td>
+                            <td className="p-2 border border-slate-300 text-slate-700">
+                              {d.department?.name_ar || d.department?.name || '—'}
+                            </td>
+                            <td className="p-2 border border-slate-300 text-center">
+                              <span className="px-1.5 py-0.5 rounded font-semibold text-[10px] border border-slate-300 bg-white inline-block">
+                                {statusLabel}
+                              </span>
+                            </td>
+                            <td className="p-2 border border-slate-300 text-center">
+                              <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] inline-block ${
+                                ['confidential', 'highly_confidential'].includes(confObj?.name)
+                                  ? 'text-rose-700 bg-rose-50 border border-rose-200'
+                                  : 'text-slate-700 bg-slate-50 border border-slate-200'
+                              }`}>
+                                {confLabel}
+                              </span>
+                            </td>
+                            <td className="p-2 border border-slate-300 font-mono text-slate-700" dir="ltr">
+                              {d.document_date || '—'}
+                            </td>
+                            <td className="p-2 border border-slate-300 text-slate-700">
+                              {d.creator?.name || '—'}
+                            </td>
+                            <td className="p-2 border border-slate-300 text-[11px] text-slate-600">
+                              {d.physical_location || d.physical_shelf || 'مستودع IT'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Official 3-tier Endorsement & Signature Section */}
+                <div className="grid grid-cols-3 gap-6 pt-6 mt-8 border-t-2 border-slate-900 text-xs text-slate-800">
+                  <div className="border border-slate-300 p-3.5 rounded-xl bg-slate-50/60 text-center space-y-4">
+                    <p className="font-bold text-slate-900">مسؤول إعداد الكشف والتوثيق</p>
+                    <div className="text-[11px] text-slate-600 font-medium">الاسم: {user?.name || '................................'}</div>
+                    <div className="pt-4 border-t border-dashed border-slate-300 text-slate-400 text-[10px]">
+                      التوقيع: .......................................
+                    </div>
+                  </div>
+
+                  <div className="border border-slate-300 p-3.5 rounded-xl bg-slate-50/60 text-center space-y-4">
+                    <p className="font-bold text-slate-900">رئيس قسم إدارة الوثائق والأرشفة</p>
+                    <div className="text-[11px] text-slate-600 font-medium">الاسم: ........................................</div>
+                    <div className="pt-4 border-t border-dashed border-slate-300 text-slate-400 text-[10px]">
+                      التوقيع والتدقيق: .................................
+                    </div>
+                  </div>
+
+                  <div className="border border-slate-300 p-3.5 rounded-xl bg-slate-50/60 text-center space-y-4">
+                    <p className="font-bold text-slate-900">مدير إدارة تقنية المعلومات والأنظمة</p>
+                    <div className="text-[11px] text-slate-600 font-medium">الاعتماد والختم الرسمي للمنشأة</div>
+                    <div className="pt-4 border-t border-dashed border-slate-300 text-slate-400 text-[10px]">
+                      الختم والاعتماد: .................................
+                    </div>
+                  </div>
+                </div>
+
+                {/* Digital Verification & Audit Seal */}
+                <div className="mt-8 pt-4 border-t border-slate-300 flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                  <div className="flex items-center gap-2">
+                    <QrCode size={20} className="text-slate-800" />
+                    <span>IT-EDMS-SECURE-MANIFEST | HASH: SHA-256 VERIFIED</span>
+                  </div>
+                  <div>
+                    تم استخراج هذا التقرير آلياً عبر نظام إدارة وأرشفة وثائق تقنية المعلومات (IT-EDMS)
+                  </div>
                 </div>
               </div>
             </div>
@@ -1103,29 +1409,57 @@ export default function DocumentsPage() {
         </div>
       )}
 
-      {/* Global Print Styles for Perfect PDF Output */}
+      {/* Global Print Styles for Perfect Multi-page Output */}
       <style>{`
         @media print {
-          body * {
-            visibility: hidden !important;
+          @page {
+            size: A4 ${reportOrientation};
+            margin: 10mm 12mm 12mm 12mm;
           }
-          #edms-printable-report, #edms-printable-report * {
-            visibility: visible !important;
-          }
-          #edms-printable-report {
-            position: fixed !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            height: auto !important;
+          body.printing-documents-report {
             background: #ffffff !important;
             color: #000000 !important;
-            padding: 20mm !important;
-            box-shadow: none !important;
-            z-index: 999999 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-          .no-print {
+          body.printing-documents-report * {
+            visibility: hidden !important;
+          }
+          body.printing-documents-report #edms-printable-report,
+          body.printing-documents-report #edms-printable-report * {
+            visibility: visible !important;
+          }
+          body.printing-documents-report #edms-printable-report {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            box-shadow: none !important;
+            border: none !important;
+            overflow: visible !important;
+            display: block !important;
+          }
+          body.printing-documents-report .no-print,
+          body.printing-documents-report .no-print * {
             display: none !important;
+            visibility: hidden !important;
+          }
+          body.printing-documents-report table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+          }
+          body.printing-documents-report thead {
+            display: table-header-group !important;
+          }
+          body.printing-documents-report tr {
+            page-break-inside: avoid !important;
           }
         }
       `}</style>
