@@ -1005,11 +1005,14 @@ export default function DocumentsPage() {
                           </span>
                         </td>
                         <td onClick={e => e.stopPropagation()}>
-                          <div className="flex items-center gap-1">
-                            <button className="btn btn-secondary btn-icon btn-sm"
-                                    onClick={() => navigate(`/documents/${doc.id}`)}
-                                    title="عرض">
-                              <Eye size={13} />
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              className="btn btn-secondary btn-sm flex items-center gap-1.5 text-xs px-2.5 py-1 text-blue-300 hover:text-white hover:bg-blue-600/30 border border-blue-500/25"
+                              onClick={() => navigate(`/documents/${doc.id}`)}
+                              title="استعراض الوثيقة وتفاصيلها والمرفقات"
+                            >
+                              <Eye size={13} className="text-blue-400" />
+                              <span>استعراض</span>
                             </button>
                             {!doc.is_archived && hasPermission('documents.archive') && (
                               <button className="btn btn-secondary btn-icon btn-sm"

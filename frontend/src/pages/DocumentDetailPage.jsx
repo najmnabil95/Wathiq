@@ -12,7 +12,8 @@ import {
   FileText, ArrowRight, Download, Eye, Upload, Trash2,
   CheckCircle, XCircle, Archive, RotateCcw, Clock, Shield,
   Tag, Building2, Calendar, User, MapPin, Hash, QrCode,
-  Printer, AlertCircle, FileCheck, Layers, ExternalLink, Edit3
+  Printer, AlertCircle, FileCheck, Layers, ExternalLink, Edit3,
+  ZoomIn, ZoomOut, RotateCw, X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -76,6 +77,15 @@ export default function DocumentDetailPage() {
   const [uploadDescription, setUploadDescription] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
+  // Document / Attachment Preview Modal State
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [activePreviewAttachment, setActivePreviewAttachment] = useState(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState(null);
+  const [previewZoom, setPreviewZoom] = useState(1);
+  const [previewRotation, setPreviewRotation] = useState(0);
+
   useEffect(() => {
     fetchDocument();
   }, [id]);
@@ -108,6 +118,55 @@ export default function DocumentDetailPage() {
     setTimeout(() => {
       window.print();
     }, 60);
+  };
+
+  const handleOpenPrimaryPreview = () => {
+    if (document?.attachments && document.attachments.length > 0) {
+      handlePreviewAttachment(document.attachments[0]);
+    } else {
+      setActivePreviewAttachment(null);
+      setPreviewBlobUrl(null);
+      setPreviewError(null);
+      setPreviewModalOpen(true);
+    }
+  };
+
+  const handlePreviewAttachment = async (att) => {
+    setPreviewModalOpen(true);
+    setActivePreviewAttachment(att);
+    setPreviewZoom(1);
+    setPreviewRotation(0);
+    setPreviewError(null);
+
+    if (previewBlobUrl) {
+      URL.revokeObjectURL(previewBlobUrl);
+      setPreviewBlobUrl(null);
+    }
+
+    try {
+      setPreviewLoading(true);
+      const res = await attachmentsAPI.preview(id, att.id);
+      const mime = att.mime_type || res.headers?.['content-type'] || 'application/pdf';
+      const blob = new Blob([res.data], { type: mime });
+      const url = URL.createObjectURL(blob);
+      setPreviewBlobUrl(url);
+    } catch (err) {
+      console.error('Failed to preview file:', err);
+      setPreviewError('تعذر فتح المعاينة المباشرة لهذا الملف. يمكنك تنزيل الملف والاطلاع عليه محلياً.');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleClosePreview = () => {
+    setPreviewModalOpen(false);
+    if (previewBlobUrl) {
+      URL.revokeObjectURL(previewBlobUrl);
+      setPreviewBlobUrl(null);
+    }
+    setActivePreviewAttachment(null);
+    setPreviewZoom(1);
+    setPreviewRotation(0);
   };
 
   const fetchDocument = async () => {
@@ -352,6 +411,16 @@ export default function DocumentDetailPage() {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-white/5">
+            {/* Primary Document Preview Button */}
+            <button
+              id="document-preview-btn"
+              onClick={handleOpenPrimaryPreview}
+              className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-blue-500/25 transition cursor-pointer"
+              title="معاينة واستعراض محتوى الوثيقة والمرفقات"
+            >
+              <Eye className="w-4 h-4" />
+              <span>استعراض الوثيقة</span>
+            </button>
             {statusName === 'pending_approval' && (
               <>
                 <button
@@ -695,8 +764,16 @@ export default function DocumentDetailPage() {
 
                     <div className="flex items-center gap-2">
                       <button
+                        onClick={() => handlePreviewAttachment(att)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600/15 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/30 text-xs font-semibold transition cursor-pointer"
+                        title="معاينة واستعراض الملف"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>استعراض</span>
+                      </button>
+                      <button
                         onClick={() => handleDownloadAttachment(att.id, att.file_name || att.original_name)}
-                        className="p-2 rounded-xl bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white transition"
+                        className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
                         title="تحميل الملف"
                       >
                         <Download className="w-4 h-4" />
@@ -1113,6 +1190,274 @@ export default function DocumentDetailPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── INTERACTIVE DOCUMENT VIEWER MODAL ───────────────────────── */}
+      {previewModalOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-5 bg-slate-950/90 backdrop-blur-md animate-fade-in text-right"
+          style={{ direction: 'rtl' }}
+          onClick={handleClosePreview}
+        >
+          <div
+            className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-6xl h-[92vh] flex flex-col shadow-2xl overflow-hidden my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Viewer Top Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-slate-800 bg-slate-950/90 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                      {document?.document_number}
+                    </span>
+                    <h3 className="font-bold text-white text-sm sm:text-base truncate">
+                      {activePreviewAttachment ? (activePreviewAttachment.original_name || activePreviewAttachment.file_name) : document?.title}
+                    </h3>
+                  </div>
+                  <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                    {activePreviewAttachment
+                      ? `حجم الملف: ${activePreviewAttachment.file_size ? `${(activePreviewAttachment.file_size / 1024).toFixed(1)} KB` : 'غير محدد'}`
+                      : 'معاينة البطاقة الرقمية والبيانات الأرشيفية للوثيقة'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Controls */}
+              <div className="flex items-center gap-2">
+                {/* Multi-attachment selector if more than 1 attachment */}
+                {document?.attachments && document.attachments.length > 1 && (
+                  <select
+                    value={activePreviewAttachment?.id || ''}
+                    onChange={(e) => {
+                      const selected = document.attachments.find(a => String(a.id) === e.target.value);
+                      if (selected) handlePreviewAttachment(selected);
+                    }}
+                    className="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-blue-500"
+                  >
+                    {document.attachments.map((att, idx) => (
+                      <option key={att.id} value={att.id}>
+                        ملف {idx + 1}: {att.original_name || att.file_name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Zoom / Rotate Controls (for images) */}
+                {activePreviewAttachment && (activePreviewAttachment.mime_type?.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)$/i.test(activePreviewAttachment.file_name)) && (
+                  <div className="hidden sm:flex items-center bg-slate-800/80 border border-slate-700 rounded-xl p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewZoom(z => Math.max(0.4, z - 0.2))}
+                      className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition"
+                      title="تصغير"
+                    >
+                      <ZoomOut className="w-4 h-4" />
+                    </button>
+                    <span className="text-[11px] font-mono px-2 text-slate-300 font-semibold">
+                      {Math.round(previewZoom * 100)}%
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewZoom(z => Math.min(3, z + 0.2))}
+                      className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition"
+                      title="تكبير"
+                    >
+                      <ZoomIn className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewRotation(r => (r + 90) % 360)}
+                      className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition border-r border-slate-700/80"
+                      title="تدوير 90 درجة"
+                    >
+                      <RotateCw className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Direct Download of active attachment */}
+                {activePreviewAttachment && (
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadAttachment(activePreviewAttachment.id, activePreviewAttachment.file_name || activePreviewAttachment.original_name)}
+                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition"
+                    title="تحميل الملف"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* Open in New Window if blob exists */}
+                {previewBlobUrl && (
+                  <button
+                    type="button"
+                    onClick={() => window.open(previewBlobUrl, '_blank')}
+                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition"
+                    title="فتح في نافذة مستقلة"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={handleClosePreview}
+                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer mr-1"
+                  title="إغلاق المعاينة"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Viewer Stage / Canvas */}
+            <div className="flex-1 overflow-hidden relative flex items-center justify-center bg-slate-950/80 p-3 sm:p-5">
+              {previewLoading ? (
+                <div className="flex flex-col items-center justify-center p-12 text-slate-400">
+                  <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
+                  <p className="text-sm font-semibold text-white">جاري تحميل وتجهيز الملف للاستعراض...</p>
+                  <p className="text-xs text-slate-500 mt-1 font-mono">Streaming file content securely...</p>
+                </div>
+              ) : previewError ? (
+                <div className="bg-slate-900 border border-rose-500/30 p-8 rounded-2xl max-w-md text-center">
+                  <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto mb-3">
+                    <AlertCircle className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-white mb-2">تنبيه المعاينة المباشرة</h4>
+                  <p className="text-xs text-slate-300 mb-5 leading-relaxed">{previewError}</p>
+                  {activePreviewAttachment && (
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadAttachment(activePreviewAttachment.id, activePreviewAttachment.file_name || activePreviewAttachment.original_name)}
+                      className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold inline-flex items-center gap-2 shadow-lg shadow-blue-600/20"
+                    >
+                      <Download className="w-4 h-4" />
+                      تحميل الملف للاطلاع عليه محلياً
+                    </button>
+                  )}
+                </div>
+              ) : activePreviewAttachment && previewBlobUrl ? (
+                /* PDF File */
+                (activePreviewAttachment.mime_type?.includes('pdf') || activePreviewAttachment.file_name?.toLowerCase().endsWith('.pdf')) ? (
+                  <iframe
+                    src={previewBlobUrl}
+                    className="w-full h-full rounded-2xl border border-slate-800 bg-white shadow-2xl"
+                    title="معاينة ملف PDF"
+                  />
+                ) : /* Image File */
+                (activePreviewAttachment.mime_type?.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)$/i.test(activePreviewAttachment.file_name)) ? (
+                  <div className="w-full h-full flex items-center justify-center overflow-auto p-4">
+                    <img
+                      src={previewBlobUrl}
+                      alt={activePreviewAttachment.file_name}
+                      style={{
+                        transform: `scale(${previewZoom}) rotate(${previewRotation}deg)`,
+                        transition: 'transform 0.15s ease-out',
+                      }}
+                      className="max-h-[75vh] max-w-full object-contain shadow-2xl rounded-xl border border-white/10"
+                    />
+                  </div>
+                ) : /* Text / Code / CSV */
+                (activePreviewAttachment.mime_type?.startsWith('text/') || /\.(txt|json|csv|log|xml)$/i.test(activePreviewAttachment.file_name)) ? (
+                  <iframe
+                    src={previewBlobUrl}
+                    className="w-full h-full rounded-2xl border border-slate-800 bg-slate-900 text-slate-100 p-4 font-mono text-xs shadow-2xl"
+                    title="معاينة النص"
+                  />
+                ) : (
+                  /* Word / Excel / Archive files */
+                  <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl max-w-lg text-center shadow-2xl">
+                    <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto mb-4">
+                      <FileText className="w-8 h-8" />
+                    </div>
+                    <h4 className="text-base font-bold text-white mb-1.5">{activePreviewAttachment.original_name || activePreviewAttachment.file_name}</h4>
+                    <p className="text-xs text-slate-400 mb-6">
+                      هذا الملف من نوع المستندات المكتبية. يمكنك تحميله وتشغيله مباشرة عبر التطبيقات المكتبية المعتمدة (Microsoft Office / LibreOffice).
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadAttachment(activePreviewAttachment.id, activePreviewAttachment.file_name || activePreviewAttachment.original_name)}
+                      className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold inline-flex items-center gap-2 shadow-lg shadow-blue-600/25 cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      تنزيل وفتح الملف
+                    </button>
+                  </div>
+                )
+              ) : (
+                /* Document Digital Card View (When no attachments) */
+                <div className="w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 overflow-y-auto max-h-[80vh] shadow-2xl text-right">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
+                    <div>
+                      <span className="font-mono text-xs font-bold px-2.5 py-1 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                        {document?.document_number}
+                      </span>
+                      <h3 className="text-lg font-bold text-white mt-2">{document?.title}</h3>
+                    </div>
+                    <div className="text-left">
+                      <span className="text-xs text-slate-400 block font-mono">{document?.document_date || '—'}</span>
+                      <span className="text-xs font-semibold text-emerald-400 block mt-1">{statusLabel}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-slate-950/60 border border-slate-800 mb-6 text-xs">
+                    <div>
+                      <span className="text-slate-400 block mb-1">التصنيف:</span>
+                      <span className="text-white font-semibold">{categoryName}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block mb-1">القسم / الإدارة:</span>
+                      <span className="text-white font-semibold">{deptName}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block mb-1">مستوى السرية:</span>
+                      <span className="text-rose-400 font-semibold">{confLabel}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block mb-1">المُنشئ:</span>
+                      <span className="text-white font-semibold">{document?.creator?.name || '—'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block mb-1">موقع الحفظ الميداني:</span>
+                      <span className="text-white font-semibold">{document?.physical_location || 'المستودع الرئيسي'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block mb-1">المرفقات المسجلة:</span>
+                      <span className="text-slate-400">{document?.attachments?.length || 0} مرفق</span>
+                    </div>
+                  </div>
+
+                  <div className="mb-6">
+                    <span className="text-xs font-semibold text-slate-300 block mb-2">بيان الموضوع والوصف:</span>
+                    <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/40 p-4 rounded-xl border border-slate-800/80 whitespace-pre-line">
+                      {document?.description || 'لا يوجد وصف تفصيلي مسجل.'}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-800 text-xs">
+                    <div className="text-slate-400 flex items-center gap-2">
+                      <QrCode className="w-5 h-5 text-blue-400" />
+                      <span>فحص رقمي معتمد لنظام IT-EDMS</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { handleClosePreview(); setActiveTab('attachments'); }}
+                      className="px-4 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/30 transition font-medium"
+                    >
+                      إرفاق ملفات لهذه الوثيقة
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>,
         document.body
