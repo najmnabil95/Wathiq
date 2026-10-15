@@ -77,7 +77,23 @@ export const useAuthStore = create(
         return !!(get().token && get().user);
       },
 
-      setUser: (user) => set({ user }),
+      setUser: (user) => {
+        localStorage.setItem('edms_user', JSON.stringify(user));
+        set({ user });
+      },
+
+      updateProfile: async (data) => {
+        const res = await authAPI.updateProfile(data);
+        if (res.data?.data) {
+          get().setUser(res.data.data);
+        }
+        return res.data;
+      },
+
+      changePassword: async (data) => {
+        const res = await authAPI.changePassword(data);
+        return res.data;
+      },
     };
   },
   {

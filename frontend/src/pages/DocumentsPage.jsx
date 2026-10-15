@@ -695,7 +695,7 @@ export default function DocumentsPage() {
             {/* Quick Sort Dropdown */}
             <div className="flex items-center gap-1.5">
               <select
-                className="form-input form-select text-xs py-1.5 px-2.5 h-10 w-auto"
+                className="form-input form-select bg-[#0d1527] text-slate-100 text-xs py-1.5 px-2.5 h-10 w-auto"
                 value={`${filters.sort}-${filters.dir}`}
                 onChange={e => {
                   const [sort, dir] = e.target.value.split('-');
@@ -703,27 +703,27 @@ export default function DocumentsPage() {
                 }}
                 title="ترتيب النتائج"
               >
-                <option value="created_at-desc">الأحدث إضافة أولاً</option>
-                <option value="created_at-asc">الأقدم إضافة أولاً</option>
-                <option value="document_date-desc">تاريخ الوثيقة (الأحدث)</option>
-                <option value="document_date-asc">تاريخ الوثيقة (الأقدم)</option>
-                <option value="document_number-asc">رقم الوثيقة (تصاعدي)</option>
-                <option value="document_number-desc">رقم الوثيقة (تنازلي)</option>
-                <option value="title-asc">العنوان (أ - ي)</option>
-                <option value="title-desc">العنوان (ي - أ)</option>
+                <option value="created_at-desc" className="bg-[#0d1527] text-slate-100">الأحدث إضافة أولاً</option>
+                <option value="created_at-asc" className="bg-[#0d1527] text-slate-100">الأقدم إضافة أولاً</option>
+                <option value="document_date-desc" className="bg-[#0d1527] text-slate-100">تاريخ الوثيقة (الأحدث)</option>
+                <option value="document_date-asc" className="bg-[#0d1527] text-slate-100">تاريخ الوثيقة (الأقدم)</option>
+                <option value="document_number-asc" className="bg-[#0d1527] text-slate-100">رقم الوثيقة (تصاعدي)</option>
+                <option value="document_number-desc" className="bg-[#0d1527] text-slate-100">رقم الوثيقة (تنازلي)</option>
+                <option value="title-asc" className="bg-[#0d1527] text-slate-100">العنوان (أ - ي)</option>
+                <option value="title-desc" className="bg-[#0d1527] text-slate-100">العنوان (ي - أ)</option>
               </select>
 
               {/* Per Page */}
               <select
-                className="form-input form-select text-xs py-1.5 px-2.5 h-10 w-auto"
+                className="form-input form-select bg-[#0d1527] text-slate-100 text-xs py-1.5 px-2.5 h-10 w-auto"
                 value={filters.per_page}
                 onChange={e => handleFilterChange('per_page', parseInt(e.target.value))}
                 title="عدد النتائج بالصفحة"
               >
-                <option value={10}>10 بالصفحة</option>
-                <option value={15}>15 بالصفحة</option>
-                <option value={25}>25 بالصفحة</option>
-                <option value={50}>50 بالصفحة</option>
+                <option value={10} className="bg-[#0d1527] text-slate-100">10 بالصفحة</option>
+                <option value={15} className="bg-[#0d1527] text-slate-100">15 بالصفحة</option>
+                <option value={25} className="bg-[#0d1527] text-slate-100">25 بالصفحة</option>
+                <option value={50} className="bg-[#0d1527] text-slate-100">50 بالصفحة</option>
               </select>
             </div>
 
@@ -850,25 +850,25 @@ export default function DocumentsPage() {
             <div>
               <label className="form-label text-xs">التصنيف الموضوعي</label>
               <select
-                className="form-input form-select text-xs"
+                className="form-input form-select bg-[#0d1527] text-slate-100 text-xs"
                 value={filters.category_id}
                 onChange={e => handleFilterChange('category_id', e.target.value)}
               >
-                <option value="">كافة التصنيفات</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name_ar}</option>)}
+                <option value="" className="bg-[#0d1527] text-slate-400">كافة التصنيفات</option>
+                {categories.map(c => <option key={c.id} value={c.id} className="bg-[#0d1527] text-slate-100">{c.name_ar}</option>)}
               </select>
             </div>
 
             <div>
               <label className="form-label text-xs">القسم / الإدارة</label>
               <select
-                className="form-input form-select text-xs"
+                className="form-input form-select bg-[#0d1527] text-slate-100 text-xs"
                 value={filters.department_id}
                 onChange={e => handleFilterChange('department_id', e.target.value)}
               >
-                <option value="">كافة الأقسام</option>
+                <option value="" className="bg-[#0d1527] text-slate-400">كافة الأقسام</option>
                 {departments.map(d => (
-                  <option key={d.id} value={d.id}>
+                  <option key={d.id} value={d.id} className="bg-[#0d1527] text-slate-100">
                     {d.parent ? `↳ ${d.name_ar}` : d.name_ar}
                   </option>
                 ))}
@@ -878,24 +878,24 @@ export default function DocumentsPage() {
             <div>
               <label className="form-label text-xs">حالة الاعتماد</label>
               <select
-                className="form-input form-select text-xs"
+                className="form-input form-select bg-[#0d1527] text-slate-100 text-xs"
                 value={filters.status_id}
                 onChange={e => handleFilterChange('status_id', e.target.value)}
               >
-                <option value="">كافة الحالات</option>
-                {statuses.map(s => <option key={s.id} value={s.id}>{s.label_ar}</option>)}
+                <option value="" className="bg-[#0d1527] text-slate-400">كافة الحالات</option>
+                {statuses.map(s => <option key={s.id} value={s.id} className="bg-[#0d1527] text-slate-100">{s.label_ar}</option>)}
               </select>
             </div>
 
             <div>
               <label className="form-label text-xs">درجة السرية</label>
               <select
-                className="form-input form-select text-xs"
+                className="form-input form-select bg-[#0d1527] text-slate-100 text-xs"
                 value={filters.confidentiality_level_id}
                 onChange={e => handleFilterChange('confidentiality_level_id', e.target.value)}
               >
-                <option value="">كافة المستويات</option>
-                {confLevels.map(c => <option key={c.id} value={c.id}>{c.label_ar}</option>)}
+                <option value="" className="bg-[#0d1527] text-slate-400">كافة المستويات</option>
+                {confLevels.map(c => <option key={c.id} value={c.id} className="bg-[#0d1527] text-slate-100">{c.label_ar}</option>)}
               </select>
             </div>
 
@@ -1175,9 +1175,9 @@ export default function DocumentsPage() {
       {/* ── Printable Official Report Modal ── */}
       {printModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in no-print-backdrop">
-          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-6xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden">
+          <div className="bg-[#0c1427] border border-slate-800 rounded-2xl w-full max-w-6xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden">
             {/* Modal Interactive Header / Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-white/10 bg-slate-950/80 no-print shrink-0">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-slate-800 bg-[#080d19] no-print shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center">
                   <Printer size={18} />
@@ -1524,11 +1524,11 @@ export default function DocumentsPage() {
           onClick={handleCloseQuickPreview}
         >
           <div
-            className="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden text-slate-100"
+            className="bg-[#0c1427] border border-slate-800 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden text-slate-100"
             onClick={e => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-950/60">
+            <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-[#080d19]">
               <div className="flex items-center gap-3 min-w-0">
                 <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-500/15 text-blue-400 border border-blue-500/30">
                   {quickPreviewDoc.document_number}
@@ -1573,7 +1573,7 @@ export default function DocumentsPage() {
             {/* Modal Body: Split into Viewport and Sidebar */}
             <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
               {/* Viewport Area */}
-              <div className="lg:col-span-8 bg-slate-950/80 p-3 sm:p-4 flex flex-col min-h-[380px] lg:min-h-[540px] border-b lg:border-b-0 lg:border-l border-slate-800/80">
+              <div className="lg:col-span-8 bg-[#060a14] p-3 sm:p-4 flex flex-col min-h-[380px] lg:min-h-[540px] border-b lg:border-b-0 lg:border-l border-slate-800">
                 {/* Viewport Toolbar */}
                 <div className="flex items-center justify-between gap-2 pb-3 mb-2 border-b border-white/5">
                   <div className="flex items-center gap-2 text-xs text-slate-300 truncate">

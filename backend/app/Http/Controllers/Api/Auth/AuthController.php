@@ -98,6 +98,64 @@ class AuthController extends Controller
     }
 
     /**
+     * PUT /api/v1/auth/profile
+     */
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'name'            => ['required', 'string', 'max:150'],
+            'phone'           => ['nullable', 'string', 'max:30'],
+            'employee_number' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $user->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم تحديث الملف الشخصي بنجاح',
+            'data'    => $this->formatUser($user->fresh(['roles.permissions', 'department.organization'])),
+        ]);
+    }
+
+    /**
+     * PUT /api/v1/auth/password
+     */
+    public function changePassword(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'current_password' => ['required', 'string'],
+            'new_password'     => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        if (!Hash::check($request->input('current_password'), $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['كلمة المرور الحالية غير صحيحة'],
+            ]);
+        }
+
+        $user->update([
+            'password' => Hash::make($request->input('new_password')),
+        ]);
+
+        $this->auditService->log(
+            'password_changed',
+            $user,
+            null,
+            null,
+            'قام المستخدم بتغيير كلمة المرور الخاصة به'
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم تغيير كلمة المرور بنجاح',
+        ]);
+    }
+
+    /**
      * Format user response with permissions.
      */
     private function formatUser(User $user): array

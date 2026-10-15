@@ -52,7 +52,12 @@
 /* ── Base ── */
 *, *::before, *::after { box-sizing: border-box; }
 
+:root {
+  color-scheme: dark;
+}
+
 html {
+  color-scheme: dark;
   font-family: "Cairo", system-ui, sans-serif;
   background-color: #050810;
   color: #f0f4ff;
@@ -86,17 +91,18 @@ body {
 
 /* ── Glass Card ── */
 .glass {
-  background: rgba(13, 20, 36, 0.72);
+  background: #0c1427;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 16px;
 }
 
 .glass-sm {
-  background: rgba(13, 20, 36, 0.5);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: #0b1120;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.09);
   border-radius: 12px;
 }
 
@@ -278,12 +284,64 @@ body {
   cursor: not-allowed;
 }
 
-.form-select {
+.form-select,
+select {
   appearance: none;
+  background-color: #0d1527;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b9cc8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: left 12px center;
   padding-left: 36px;
+  color: #f0f4ff;
+  color-scheme: dark;
+}
+
+.form-select:hover,
+select:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.form-select:focus,
+select:focus {
+  background-color: #0d1527;
+  border-color: rgba(59, 130, 246, 0.6);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* ── Native Options & Dropdown Menus Dark Theme ── */
+select option,
+select optgroup,
+.form-select option,
+.form-select optgroup {
+  background-color: #0d1527 !important;
+  color: #e2e8f0 !important;
+  font-family: "Cairo", sans-serif;
+  font-size: 0.875rem;
+  padding: 10px 14px;
+}
+
+select optgroup,
+.form-select optgroup {
+  font-weight: 700;
+  color: #93c5fd !important;
+  background-color: #080d19 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+select option:hover,
+select option:focus,
+select option:checked,
+.form-select option:hover,
+.form-select option:focus,
+.form-select option:checked {
+  background-color: #1e3a8a !important;
+  color: #ffffff !important;
+}
+
+select option:disabled,
+.form-select option:disabled {
+  color: #526080 !important;
+  background-color: #080d19 !important;
 }
 
 .form-error {

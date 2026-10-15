@@ -255,16 +255,16 @@ export default function CategoriesPage() {
       {/* ── CREATE / EDIT MODAL ────────────────────────────────────── */}
       {modalOpen && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md"
           style={{ direction: 'rtl', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
           onClick={() => setModalOpen(false)}
         >
           <div
-            className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto text-right"
+            className="bg-[#0c1427] border border-slate-800 rounded-3xl w-full max-w-md shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto text-right"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-slate-900/95">
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-[#0c1427]">
               <h3 className="text-base font-bold text-white">
                 {editingCategory ? 'تعديل التصنيف الأرشيفي' : 'إضافة تصنيف أرشيفي جديد'}
               </h3>
@@ -288,7 +288,7 @@ export default function CategoriesPage() {
                     placeholder="مثال: تعديلات البرامج والأنظمة"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
@@ -300,7 +300,7 @@ export default function CategoriesPage() {
                       placeholder="مثال: SYS-MOD"
                       value={formData.code}
                       onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                      className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                      className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
                     />
                   </div>
                   <div>
@@ -324,13 +324,13 @@ export default function CategoriesPage() {
                     placeholder="شرح موجز لنوعية الوثائق والملفات التي تتبع هذا التصنيف..."
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-[#070d1a] border border-slate-800 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none"
                   />
                 </div>
               </div>
 
               {/* Fixed Footer */}
-              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-slate-900/95 shrink-0">
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-[#0c1427] shrink-0">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}

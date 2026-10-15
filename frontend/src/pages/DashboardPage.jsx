@@ -79,15 +79,22 @@ function MonthlyTrendChart({ data = [] }) {
   const [hoveredBar, setHoveredBar] = useState(null);
   const navigate = useNavigate();
 
-  // If no monthly data or single point, mock previous months for a full 6-month visual
-  const chartData = data.length >= 3 ? data : [
-    { month: '2026-05', total: 4 },
-    { month: '2026-06', total: 7 },
-    { month: '2026-07', total: 6 },
-    { month: '2026-08', total: 9 },
-    { month: '2026-09', total: 11 },
-    ...(data.length > 0 && !data.some(d => d.month === '2026-09') ? data : []),
-  ];
+  // Real timeline of last 6 months with actual database counts (0 for months without documents)
+  const chartData = (() => {
+    if (data && data.length >= 6) return data.slice(-6);
+    const now = new Date();
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const found = Array.isArray(data) ? data.find(item => item.month === mStr) : null;
+      months.push({
+        month: mStr,
+        total: found ? (Number(found.total) || 0) : 0,
+      });
+    }
+    return months;
+  })();
 
   const maxVal = Math.max(...chartData.map(d => d.total), 1);
 
@@ -548,28 +555,33 @@ export default function DashboardPage() {
   const [pendingApprovals, setPendingApprovals] = useState([]);
   const [activity,         setActivity]         = useState([]);
   const [loading,          setLoading]          = useState(true);
+  const [refreshing,       setRefreshing]       = useState(false);
+
+  const loadData = async (isManual = false) => {
+    if (isManual) setRefreshing(true);
+    else setLoading(true);
+
+    try {
+      const [s, d, a, ac] = await Promise.all([
+        dashboardAPI.stats(),
+        dashboardAPI.recentDocuments(),
+        dashboardAPI.pendingApprovals(),
+        dashboardAPI.activity(),
+      ]);
+      setStatsData(s.data.data);
+      setRecentDocs(d.data.data);
+      setPendingApprovals(a.data.data);
+      setActivity(ac.data.data);
+    } catch (e) {
+      console.error('Failed to load dashboard data:', e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const [s, d, a, ac] = await Promise.all([
-          dashboardAPI.stats(),
-          dashboardAPI.recentDocuments(),
-          dashboardAPI.pendingApprovals(),
-          dashboardAPI.activity(),
-        ]);
-        setStatsData(s.data.data);
-        setRecentDocs(d.data.data);
-        setPendingApprovals(a.data.data);
-        setActivity(ac.data.data);
-      } catch (e) {
-        console.error('Failed to load dashboard data:', e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    loadData();
   }, []);
 
   if (loading) {
@@ -608,6 +620,15 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => loadData(true)}
+            disabled={refreshing}
+            className="btn btn-secondary"
+            title="تحديث البيانات"
+          >
+            <RefreshCw size={14} className={refreshing ? 'animate-spin text-blue-400' : ''} />
+            <span className="hidden sm:inline">تحديث</span>
+          </button>
           <button
             onClick={() => navigate('/documents')}
             className="btn btn-secondary"

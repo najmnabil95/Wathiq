@@ -281,11 +281,11 @@ export default function AuditPage() {
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md animate-fade-in"
         >
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+          <div className="bg-[#0c1427] border border-slate-800 rounded-3xl w-full max-w-xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#0c1427]">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Activity className="w-5 h-5 text-purple-400" />
                 تفاصيل السجل التقني #{selectedLog.id}
@@ -293,7 +293,7 @@ export default function AuditPage() {
               <button
                 type="button"
                 onClick={() => setSelectedLog(null)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -301,34 +301,34 @@ export default function AuditPage() {
 
             {/* Modal Scrollable Body */}
             <div className="p-6 overflow-y-auto space-y-4 text-xs">
-              <div className="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
-                <span className="text-slate-500 block mb-1">البيان والحدث:</span>
-                <span className="font-semibold text-slate-200 text-sm">{selectedLog.description}</span>
+              <div className="bg-[#070d1a] p-3.5 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block mb-1">البيان والحدث:</span>
+                <span className="font-semibold text-slate-100 text-sm">{selectedLog.description}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-                  <span className="text-slate-500 block mb-1">نوع العملية:</span>
-                  <span className="font-mono text-slate-300">{selectedLog.action}</span>
+                <div className="bg-[#070d1a] p-3 rounded-xl border border-slate-800">
+                  <span className="text-slate-400 block mb-1">نوع العملية:</span>
+                  <span className="font-mono text-slate-200">{selectedLog.action}</span>
                 </div>
-                <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-                  <span className="text-slate-500 block mb-1">المستخدم الفاعل:</span>
-                  <span className="font-bold text-slate-200">{selectedLog.user?.name || selectedLog.user_name || 'النظام'}</span>
+                <div className="bg-[#070d1a] p-3 rounded-xl border border-slate-800">
+                  <span className="text-slate-400 block mb-1">المستخدم الفاعل:</span>
+                  <span className="font-bold text-slate-100">{selectedLog.user?.name || selectedLog.user_name || 'النظام'}</span>
                 </div>
-                <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-                  <span className="text-slate-500 block mb-1">عنوان IP:</span>
-                  <span className="font-mono text-slate-300">{selectedLog.ip_address || '—'}</span>
+                <div className="bg-[#070d1a] p-3 rounded-xl border border-slate-800">
+                  <span className="text-slate-400 block mb-1">عنوان IP:</span>
+                  <span className="font-mono text-slate-200">{selectedLog.ip_address || '—'}</span>
                 </div>
-                <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-                  <span className="text-slate-500 block mb-1">التوقيت الدقيق:</span>
-                  <span className="font-mono text-slate-300" style={{ direction: 'ltr', display: 'inline-block' }}>{formatEnglishDate(selectedLog.created_at)}</span>
+                <div className="bg-[#070d1a] p-3 rounded-xl border border-slate-800">
+                  <span className="text-slate-400 block mb-1">التوقيت الدقيق:</span>
+                  <span className="font-mono text-slate-200" style={{ direction: 'ltr', display: 'inline-block' }}>{formatEnglishDate(selectedLog.created_at)}</span>
                 </div>
               </div>
 
               {selectedLog.old_values && (
                 <div>
                   <span className="text-slate-400 block mb-1 font-medium">البيانات السابقة (Old Values):</span>
-                  <pre className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 font-mono text-[11px] text-slate-300 overflow-x-auto max-h-40">
+                  <pre className="bg-[#070d1a] p-3.5 rounded-xl border border-slate-800 font-mono text-[11px] text-slate-300 overflow-x-auto max-h-40">
                     {JSON.stringify(selectedLog.old_values, null, 2)}
                   </pre>
                 </div>
@@ -337,7 +337,7 @@ export default function AuditPage() {
               {selectedLog.new_values && (
                 <div>
                   <span className="text-slate-400 block mb-1 font-medium">البيانات الجديدة (New Values):</span>
-                  <pre className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 font-mono text-[11px] text-emerald-300 overflow-x-auto max-h-40">
+                  <pre className="bg-[#070d1a] p-3.5 rounded-xl border border-slate-800 font-mono text-[11px] text-emerald-300 overflow-x-auto max-h-40">
                     {JSON.stringify(selectedLog.new_values, null, 2)}
                   </pre>
                 </div>
@@ -345,11 +345,11 @@ export default function AuditPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex justify-end px-6 py-3.5 border-t border-slate-800 bg-slate-900/90 backdrop-blur-md">
+            <div className="flex justify-end px-6 py-3.5 border-t border-slate-800 bg-[#0c1427]">
               <button
                 type="button"
                 onClick={() => setSelectedLog(null)}
-                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition"
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium transition cursor-pointer"
               >
                 إغلاق
               </button>

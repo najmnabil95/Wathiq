@@ -35,8 +35,10 @@ Route::prefix('v1/auth')->group(function () {
          ->middleware('throttle:5,1'); // 5 attempts per minute
 
     Route::middleware('auth:sanctum')->group(function () {
-        Route::post('/logout', [AuthController::class, 'logout']);
-        Route::get('/me',      [AuthController::class, 'me']);
+        Route::post('/logout',   [AuthController::class, 'logout']);
+        Route::get('/me',        [AuthController::class, 'me']);
+        Route::put('/profile',   [AuthController::class, 'updateProfile']);
+        Route::put('/password',  [AuthController::class, 'changePassword']);
     });
 });
 

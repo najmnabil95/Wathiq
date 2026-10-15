@@ -552,16 +552,16 @@ export default function DepartmentsPage() {
       {/* ── CREATE / EDIT MODAL ────────────────────────────────────── */}
       {modalOpen && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md"
           style={{ direction: 'rtl', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
           onClick={() => setModalOpen(false)}
         >
           <div
-            className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto text-right"
+            className="bg-[#0c1427] border border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto text-right"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-slate-900/95">
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-[#0c1427]">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
                   {isBranch ? <GitFork className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
@@ -593,7 +593,7 @@ export default function DepartmentsPage() {
 
             {/* Type Switcher (only in create mode) */}
             {modalMode === 'create' && (
-              <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+              <div className="grid grid-cols-2 gap-2 bg-[#070d1a] p-1.5 rounded-xl border border-slate-800">
                 <button
                   type="button"
                   onClick={() => {
@@ -642,7 +642,7 @@ export default function DepartmentsPage() {
                     value={formData.parent_id}
                     onChange={(e) => handleParentChange(e.target.value)}
                     required
-                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500"
                   >
                     <option value="">اختر القسم الرئيسي...</option>
                     {rootDepartments.map(r => (
@@ -665,7 +665,7 @@ export default function DepartmentsPage() {
                   value={formData.name_ar}
                   onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
                   placeholder={isBranch ? 'مثال: فرع الشبكات والاتصالات، فرع الدعم الفني...' : 'مثال: إدارة تقنية المعلومات، الإدارة المالية...'}
-                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                  className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
               </div>
 
@@ -681,7 +681,7 @@ export default function DepartmentsPage() {
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                     placeholder={isBranch ? 'IT-NET' : 'IT'}
-                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm font-mono text-blue-400 placeholder-slate-600 uppercase focus:outline-none focus:border-blue-500"
+                    className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm font-mono text-blue-400 placeholder-slate-500 uppercase focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
@@ -694,7 +694,7 @@ export default function DepartmentsPage() {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="Networks & Telecom Branch"
-                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
@@ -709,7 +709,7 @@ export default function DepartmentsPage() {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="وصف مختصر لطبيعة المعاملات والوثائق الخاصة بهذا الفرع..."
-                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                  className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none"
                 />
               </div>
 
@@ -730,7 +730,7 @@ export default function DepartmentsPage() {
               </div>
 
               {/* Fixed Footer */}
-              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-slate-900/95 shrink-0">
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-[#0c1427] shrink-0">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}

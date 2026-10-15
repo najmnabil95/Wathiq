@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace Database\Seeders;
 
@@ -12,7 +12,7 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        ->call([
+        $this->call([
             // 1. Core lookup data (no dependencies)
             CoreDataSeeder::class,
 

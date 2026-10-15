@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
+import { dashboardAPI } from '../../services/api';
 import {
   LayoutDashboard, FolderOpen, FolderTree, Users, ShieldCheck,
   Settings, LogOut, Menu, X, Bell, Search, ChevronDown,
-  ChevronRight, ChevronLeft, Archive, FileText, Activity, Shield, Building2
+  ChevronRight, ChevronLeft, Archive, FileText, Activity, Shield, Building2,
+  User
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -31,6 +33,7 @@ const PAGE_TITLES = {
   '/roles':               'الأدوار والصلاحيات | وثيق IT-EDMS',
   '/audit':               'سجل العمليات والرقابة | وثيق IT-EDMS',
   '/settings':            'إعدادات النظام | وثيق IT-EDMS',
+  '/profile':             'الملف الشخصي | وثيق IT-EDMS',
 };
 
 // ── Hook: Close on outside click ────────────────────────────
@@ -58,6 +61,7 @@ export default function AppLayout() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [device, setDevice] = useState('desktop');
+  const [pendingCount, setPendingCount] = useState(0);
 
   const isMobile = device === 'mobile';
 
@@ -83,6 +87,19 @@ export default function AppLayout() {
     return () => window.removeEventListener('resize', check);
   }, []);
 
+  // Fetch pending approvals count for live notification badge
+  useEffect(() => {
+    let active = true;
+    dashboardAPI.stats()
+      .then(res => {
+        if (active && res.data?.data?.pending_approvals !== undefined) {
+          setPendingCount(Number(res.data.data.pending_approvals) || 0);
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [location.pathname]);
+
   // Dynamic page title
   useEffect(() => {
     if (location.pathname.startsWith('/documents/') && location.pathname !== '/documents/create') {
@@ -98,6 +115,19 @@ export default function AppLayout() {
     setUserMenuOpen(false);
     setNotifOpen(false);
   }, [location.pathname, isMobile]);
+
+  // Close overlays on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setUserMenuOpen(false);
+        setNotifOpen(false);
+        if (isMobile) setSidebarOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMobile]);
 
   const handleLogout = async () => {
     setUserMenuOpen(false);
@@ -115,6 +145,7 @@ export default function AppLayout() {
   const getPageTitle = () => {
     if (location.pathname.startsWith('/documents/create')) return 'وثيقة جديدة';
     if (location.pathname.match(/^\/documents\/\d+/)) return 'تفاصيل الوثيقة';
+    if (location.pathname === '/profile') return 'الملف الشخصي والحساب';
     const item = navItems.find(n => {
       if (n.exact) return location.pathname === n.to;
       return location.pathname.startsWith(n.to) && n.to !== '/';
@@ -350,32 +381,63 @@ export default function AppLayout() {
                 title="التنبيهات والإشعارات"
               >
                 <Bell size={16} />
-                <span
-                  className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full"
-                  style={{ background: '#3b82f6', boxShadow: '0 0 6px rgba(59,130,246,0.8)', animation: 'pulse-glow 2s infinite' }}
-                />
+                {pendingCount > 0 ? (
+                  <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-amber-500 text-[10px] font-bold text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                    {pendingCount > 9 ? '9+' : pendingCount}
+                  </span>
+                ) : (
+                  <span
+                    className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full"
+                    style={{ background: '#3b82f6', boxShadow: '0 0 6px rgba(59,130,246,0.8)', animation: 'pulse-glow 2s infinite' }}
+                  />
+                )}
               </button>
 
               {notifOpen && (
                 <div
                   ref={notifRef}
-                  className="fixed sm:absolute top-[70px] sm:top-auto sm:mt-2 left-3 sm:left-0 right-3 sm:right-auto w-auto sm:w-80 glass-sm shadow-2xl p-4 z-50 animate-slide-down"
-                  style={{ direction: 'rtl', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)' }}
+                  className="fixed sm:absolute top-[70px] sm:top-auto sm:mt-2 left-3 sm:left-0 right-3 sm:right-auto w-auto sm:w-80 shadow-2xl p-4 z-50 animate-slide-down rounded-2xl border border-slate-700/80"
+                  style={{
+                    direction: 'rtl',
+                    backgroundColor: '#0c1322',
+                    boxShadow: '0 25px 60px -15px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.08)',
+                  }}
                 >
-                  <div className="flex items-center justify-between pb-3 mb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
                     <div className="flex items-center gap-2">
                       <Bell size={14} className="text-blue-400" />
-                      <span className="font-bold text-sm" style={{ color: '#e2e8f0' }}>مركز التنبيهات</span>
+                      <span className="font-bold text-sm text-slate-100">مركز التنبيهات</span>
                     </div>
-                    <button onClick={() => setNotifOpen(false)} className="p-1 rounded-lg hover:bg-white/5 transition">
-                      <X size={13} style={{ color: '#526080' }} />
+                    <button onClick={() => setNotifOpen(false)} className="p-1 rounded-lg hover:bg-white/10 transition text-slate-400 hover:text-white">
+                      <X size={13} />
                     </button>
                   </div>
                   <div className="space-y-2 max-h-64 overflow-y-auto no-scrollbar">
                     {[
-                      { bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.18)', title: 'طلبات اعتماد بانتظارك', desc: 'يوجد وثائق بحاجة للمراجعة واتخاذ قرار.', color: '#fcd34d', to: '/documents?pending=true' },
-                      { bg: 'rgba(30,40,60,0.6)',   border: 'rgba(255,255,255,0.06)', title: 'سجل النشاط والتدقيق',    desc: 'تم توثيق آخر حركات الدخول والتعديلات.', color: '#cbd5e1', to: '/audit' },
-                      { bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.18)', title: 'حالة النظام سليمة',       desc: 'قاعدة البيانات متصلة والنسخ الاحتياطي يعمل.', color: '#93c5fd', to: null },
+                      {
+                        bg: 'rgba(245,158,11,0.14)',
+                        border: 'rgba(245,158,11,0.3)',
+                        title: pendingCount > 0 ? `طلبات اعتماد بانتظارك (${pendingCount})` : 'طلبات الاعتماد',
+                        desc: pendingCount > 0 ? `يوجد ${pendingCount} وثيقة بحاجة للمراجعة واتخاذ قرار.` : 'لا توجد طلبات اعتماد معلقة حالياً.',
+                        color: '#fcd34d',
+                        to: '/documents?pending=true'
+                      },
+                      {
+                        bg: '#121c32',
+                        border: 'rgba(255,255,255,0.08)',
+                        title: 'سجل النشاط والتدقيق',
+                        desc: 'تم توثيق آخر حركات الدخول والتعديلات.',
+                        color: '#cbd5e1',
+                        to: '/audit'
+                      },
+                      {
+                        bg: 'rgba(59,130,246,0.12)',
+                        border: 'rgba(59,130,246,0.3)',
+                        title: 'حالة النظام سليمة',
+                        desc: 'قاعدة البيانات متصلة ومستقرة.',
+                        color: '#93c5fd',
+                        to: null
+                      },
                     ].map((n, i) => (
                       <div
                         key={i}
@@ -386,11 +448,11 @@ export default function AppLayout() {
                           border: `1px solid ${n.border}`,
                           cursor: n.to ? 'pointer' : 'default',
                         }}
-                        onMouseEnter={e => { if (n.to) e.currentTarget.style.opacity = '0.8'; }}
+                        onMouseEnter={e => { if (n.to) e.currentTarget.style.opacity = '0.85'; }}
                         onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
                       >
                         <div className="text-xs font-bold" style={{ color: n.color }}>{n.title}</div>
-                        <div className="text-[11px] mt-0.5" style={{ color: '#7a90a8' }}>{n.desc}</div>
+                        <div className="text-[11px] mt-0.5 text-slate-400">{n.desc}</div>
                       </div>
                     ))}
                   </div>
@@ -405,40 +467,52 @@ export default function AppLayout() {
                 id="user-menu-btn"
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all"
                 style={{
-                  background: userMenuOpen ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${userMenuOpen ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.08)'}`,
+                  background: userMenuOpen ? 'rgba(59,130,246,0.12)' : 'rgba(255,255,255,0.05)',
+                  border: `1px solid ${userMenuOpen ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.1)'}`,
                   transition: 'all 0.18s ease',
                 }}
                 onClick={() => { setUserMenuOpen(v => !v); setNotifOpen(false); }}
               >
                 <div
                   className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-blue-300"
-                  style={{ background: 'rgba(59,130,246,0.18)' }}
+                  style={{ background: 'rgba(59,130,246,0.22)' }}
                 >
                   {user?.name?.[0] || 'م'}
                 </div>
-                <span className="text-[13px] font-semibold hidden md:block max-w-[100px] truncate" style={{ color: '#c8d8f0' }}>
+                <span className="text-[13px] font-semibold hidden md:block max-w-[100px] truncate text-slate-200">
                   {user?.name}
                 </span>
                 <ChevronDown
                   size={13}
-                  style={{ color: '#526080', transform: userMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s ease' }}
+                  style={{ color: '#8b9cc8', transform: userMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s ease' }}
                 />
               </button>
 
               {userMenuOpen && (
                 <div
                   ref={userMenuRef}
-                  className="absolute top-full left-0 mt-2 w-52 glass-sm shadow-2xl py-1 animate-slide-down"
-                  style={{ zIndex: 100, border: '1px solid rgba(255,255,255,0.08)' }}
+                  className="absolute top-full left-0 mt-2 w-56 shadow-2xl py-1.5 animate-slide-down rounded-2xl border border-slate-700/80"
+                  style={{
+                    zIndex: 100,
+                    backgroundColor: '#0c1322',
+                    boxShadow: '0 25px 60px -15px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.08)',
+                  }}
                 >
-                  <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div className="text-[13px] font-bold" style={{ color: '#e2e8f0' }}>{user?.name}</div>
-                    <div className="text-[11px] truncate mt-0.5" style={{ color: '#45607a' }}>{user?.email}</div>
+                  <div className="px-4 py-3 bg-[#080d19]/90 rounded-t-xl border-b border-slate-800">
+                    <div className="text-[13px] font-bold text-slate-100">{user?.name}</div>
+                    <div className="text-[11px] truncate mt-0.5 text-slate-400 font-mono">{user?.email}</div>
                   </div>
                   <button
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-red-500/08"
-                    style={{ color: '#f87171', fontFamily: 'Cairo, sans-serif', background: 'none', border: 'none', cursor: 'pointer', direction: 'rtl' }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-xs transition-colors hover:bg-white/10 text-slate-200"
+                    style={{ fontFamily: 'Cairo, sans-serif', background: 'none', border: 'none', cursor: 'pointer', direction: 'rtl' }}
+                    onClick={() => { setUserMenuOpen(false); navigate('/profile'); }}
+                  >
+                    <User size={14} className="text-blue-400" />
+                    الملف الشخصي والحساب
+                  </button>
+                  <button
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-xs transition-colors hover:bg-rose-500/15 text-rose-400"
+                    style={{ fontFamily: 'Cairo, sans-serif', background: 'none', border: 'none', cursor: 'pointer', direction: 'rtl', borderTop: '1px solid rgba(255,255,255,0.06)' }}
                     onClick={handleLogout}
                   >
                     <LogOut size={14} />

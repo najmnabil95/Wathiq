@@ -289,14 +289,17 @@ class DocumentController extends Controller
 
         $document = Document::findOrFail($id);
 
-        $request->validate(['comments' => ['nullable', 'string']]);
+        $request->validate([
+            'comment'  => ['nullable', 'string'],
+            'comments' => ['nullable', 'string'],
+        ]);
 
         $approval = $document->pendingApprovals()->first();
 
         if ($approval) {
             $approval->update([
                 'status'      => 'approved',
-                'comments'    => $request->input('comments'),
+                'comments'    => $request->input('comment', $request->input('comments')),
                 'approved_at' => now(),
             ]);
         }
@@ -317,14 +320,17 @@ class DocumentController extends Controller
 
         $document = Document::findOrFail($id);
 
-        $request->validate(['comments' => ['required', 'string', 'min:5']]);
+        $request->validate([
+            'comment'  => ['required_without:comments', 'nullable', 'string', 'min:5'],
+            'comments' => ['required_without:comment', 'nullable', 'string', 'min:5'],
+        ]);
 
         $approval = $document->pendingApprovals()->first();
 
         if ($approval) {
             $approval->update([
                 'status'   => 'rejected',
-                'comments' => $request->input('comments'),
+                'comments' => $request->input('comment', $request->input('comments')),
             ]);
         }
 

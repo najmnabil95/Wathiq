@@ -1419,15 +1419,15 @@ export default function DocumentDetailPage() {
       {/* ── APPROVAL / REJECTION MODAL ──────────────────────────────── */}
       {approvalModal.open && typeof window !== 'undefined' && window.document?.body && createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md"
           style={{ direction: 'rtl', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
           onClick={() => setApprovalModal({ open: false, type: 'approve' })}
         >
           <div
-            className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto text-right"
+            className="bg-[#0c1427] border border-slate-800 rounded-3xl w-full max-w-md shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto text-right"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-slate-900/95">
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-[#0c1427]">
               <h3 className="text-base font-bold text-white">
                 {approvalModal.type === 'approve' ? 'تأكيد اعتماد الوثيقة' : 'تأكيد رفض الوثيقة'}
               </h3>
@@ -1452,11 +1452,11 @@ export default function DocumentDetailPage() {
                 placeholder="اكتب ملاحظاتك وتوجيهاتك الإدارية هنا..."
                 value={approvalComment}
                 onChange={(e) => setApprovalComment(e.target.value)}
-                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 transition resize-none"
+                className="w-full bg-[#070d1a] border border-slate-800 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition resize-none"
               />
             </div>
 
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-slate-900/95 shrink-0">
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-[#0c1427] shrink-0">
               <button
                 type="button"
                 onClick={() => setApprovalModal({ open: false, type: 'approve' })}
@@ -1485,15 +1485,15 @@ export default function DocumentDetailPage() {
       {/* ── EDIT DOCUMENT MODAL ──────────────────────────────────────── */}
       {editModalOpen && typeof window !== 'undefined' && window.document?.body && createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md"
           style={{ direction: 'rtl', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
           onClick={() => setEditModalOpen(false)}
         >
           <div
-            className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto text-right"
+            className="bg-[#0c1427] border border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto text-right"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-slate-900/95">
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-[#0c1427]">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Edit3 className="w-5 h-5 text-blue-400" />
                 تعديل بيانات الوثيقة
@@ -1516,7 +1516,7 @@ export default function DocumentDetailPage() {
                     required
                     value={editForm.title}
                     onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
@@ -1526,7 +1526,7 @@ export default function DocumentDetailPage() {
                     rows={3}
                     value={editForm.description}
                     onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 resize-none"
+                    className="w-full bg-[#070d1a] border border-slate-800 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none"
                   />
                 </div>
 
@@ -1536,12 +1536,12 @@ export default function DocumentDetailPage() {
                     type="text"
                     value={editForm.notes}
                     onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-slate-900/95 shrink-0">
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-[#0c1427] shrink-0">
                 <button
                   type="button"
                   onClick={() => setEditModalOpen(false)}
@@ -1571,11 +1571,11 @@ export default function DocumentDetailPage() {
           onClick={handleClosePreview}
         >
           <div
-            className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-6xl h-[92vh] flex flex-col shadow-2xl overflow-hidden my-auto"
+            className="bg-[#0c1427] border border-slate-800 rounded-3xl w-full max-w-6xl h-[92vh] flex flex-col shadow-2xl overflow-hidden my-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Viewer Top Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-slate-800 bg-slate-950/90 shrink-0">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-slate-800 bg-[#080d19] shrink-0">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
                   <Eye className="w-5 h-5" />
@@ -1687,7 +1687,7 @@ export default function DocumentDetailPage() {
             </div>
 
             {/* Viewer Stage / Canvas */}
-            <div className="flex-1 overflow-hidden relative flex items-center justify-center bg-slate-950/80 p-3 sm:p-5">
+            <div className="flex-1 overflow-hidden relative flex items-center justify-center bg-[#060a14] p-3 sm:p-5">
               {previewLoading ? (
                 <div className="flex flex-col items-center justify-center p-12 text-slate-400">
                   <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />

@@ -11,25 +11,87 @@ export default function SettingsPage() {
   const { user } = useAuthStore();
 
   const [saving, setSaving] = useState(false);
-  const [numberingPattern, setNumberingPattern] = useState('{CAT}-{YEAR}-{SEQ:4}');
-  const [retentionYears, setRetentionYears] = useState('7');
-  const [requireMFA, setRequireMFA] = useState(true);
-  const [shaCheckEnabled, setShaCheckEnabled] = useState(true);
+  const [numberingPattern, setNumberingPattern] = useState(() => {
+    try {
+      const saved = localStorage.getItem('edms_system_settings');
+      return saved ? JSON.parse(saved).numberingPattern : '{CAT}-{YEAR}-{SEQ:4}';
+    } catch {
+      return '{CAT}-{YEAR}-{SEQ:4}';
+    }
+  });
+  const [retentionYears, setRetentionYears] = useState(() => {
+    try {
+      const saved = localStorage.getItem('edms_system_settings');
+      return saved ? JSON.parse(saved).retentionYears : '7';
+    } catch {
+      return '7';
+    }
+  });
+  const [requireMFA, setRequireMFA] = useState(() => {
+    try {
+      const saved = localStorage.getItem('edms_system_settings');
+      return saved ? JSON.parse(saved).requireMFA : true;
+    } catch {
+      return true;
+    }
+  });
+  const [shaCheckEnabled, setShaCheckEnabled] = useState(() => {
+    try {
+      const saved = localStorage.getItem('edms_system_settings');
+      return saved ? JSON.parse(saved).shaCheckEnabled : true;
+    } catch {
+      return true;
+    }
+  });
 
   const handleSave = (e) => {
     e.preventDefault();
     setSaving(true);
-    setTimeout(() => {
+    try {
+      const settingsObj = {
+        numberingPattern,
+        retentionYears,
+        requireMFA,
+        shaCheckEnabled,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user?.name || 'Administrator',
+      };
+      localStorage.setItem('edms_system_settings', JSON.stringify(settingsObj));
+      setTimeout(() => {
+        setSaving(false);
+        toast.success('تم حفظ إعدادات النظام وسياسات الأرشفة بنجاح');
+      }, 350);
+    } catch (err) {
       setSaving(false);
-      toast.success('تم حفظ إعدادات النظام وسياسات الأرشفة بنجاح');
-    }, 600);
+      toast.error('حدث خطأ أثناء حفظ الإعدادات');
+    }
   };
 
   const handleBackup = () => {
-    toast.loading('جاري توليد نسخة احتياطية مشفرة لقاعدة البيانات...', { id: 'backup' });
+    toast.loading('جاري توليد ملف النسخة الاحتياطية وإعدادات النظام...', { id: 'backup' });
     setTimeout(() => {
-      toast.success('تم إنشاء نسخة النسخ الاحتياطي وتخزينها في مسار الحفظ الآمن', { id: 'backup' });
-    }, 1500);
+      const backupData = {
+        exportDate: new Date().toISOString(),
+        version: 'IT-EDMS v2.4 Enterprise',
+        exportedBy: user?.email || 'admin',
+        settings: {
+          numberingPattern,
+          retentionYears,
+          requireMFA,
+          shaCheckEnabled,
+        },
+      };
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `it-edms-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('تم إنشاء نسخة النسخ الاحتياطي وتحميلها بنجاح', { id: 'backup' });
+    }, 1000);
   };
 
   return (

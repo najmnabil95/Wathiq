@@ -281,9 +281,9 @@ export default function CreateDocumentPage() {
                 <label className="form-label">التصنيف <span className="required">*</span></label>
                 <select id="doc-category" name="category_id" value={form.category_id}
                         onChange={handleChange}
-                        className={`form-input form-select ${errors.category_id ? 'border-red-500/50' : ''}`}>
-                  <option value="">اختر التصنيف...</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name_ar}</option>)}
+                        className={`form-input form-select bg-[#0d1527] text-slate-100 ${errors.category_id ? 'border-red-500/50' : ''}`}>
+                  <option value="" className="bg-[#0d1527] text-slate-400">اختر التصنيف...</option>
+                  {categories.map(c => <option key={c.id} value={c.id} className="bg-[#0d1527] text-slate-100">{c.name_ar}</option>)}
                 </select>
                 {errors.category_id && <p className="form-error"><AlertCircle size={12}/>{errors.category_id}</p>}
               </div>
@@ -291,9 +291,9 @@ export default function CreateDocumentPage() {
                 <label className="form-label">نوع الوثيقة <span className="required">*</span></label>
                 <select id="doc-type" name="document_type_id" value={form.document_type_id}
                         onChange={handleChange} disabled={!form.category_id}
-                        className={`form-input form-select ${errors.document_type_id ? 'border-red-500/50' : ''}`}>
-                  <option value="">اختر نوع الوثيقة...</option>
-                  {docTypes.map(t => <option key={t.id} value={t.id}>{t.name_ar}</option>)}
+                        className={`form-input form-select bg-[#0d1527] text-slate-100 ${errors.document_type_id ? 'border-red-500/50' : ''}`}>
+                  <option value="" className="bg-[#0d1527] text-slate-400">اختر نوع الوثيقة...</option>
+                  {docTypes.map(t => <option key={t.id} value={t.id} className="bg-[#0d1527] text-slate-100">{t.name_ar}</option>)}
                 </select>
                 {errors.document_type_id && <p className="form-error"><AlertCircle size={12}/>{errors.document_type_id}</p>}
               </div>
@@ -421,18 +421,18 @@ export default function CreateDocumentPage() {
                 name="department_id"
                 value={form.department_id}
                 onChange={handleChange}
-                className={`form-input form-select ${errors.department_id ? 'border-red-500/50' : ''}`}
+                className={`form-input form-select bg-[#0d1527] text-slate-100 ${errors.department_id ? 'border-red-500/50' : ''}`}
               >
-                <option value="">اختر القسم أو الفرع التابع...</option>
+                <option value="" className="bg-[#0d1527] text-slate-400">اختر القسم أو الفرع التابع...</option>
                 {departments.filter(d => !d.parent_id).map(root => {
                   const branches = departments.filter(d => d.parent_id === root.id);
                   return (
-                    <optgroup key={root.id} label={`🏛️ ${root.name_ar} (${root.code})`}>
-                      <option value={root.id}>
+                    <optgroup key={root.id} label={`🏛️ ${root.name_ar} (${root.code})`} className="bg-[#080d19] text-blue-300 font-bold">
+                      <option value={root.id} className="bg-[#0d1527] text-slate-100">
                         {root.name_ar} (المركز الرئيسي / الإدارة العامة)
                       </option>
                       {branches.map(b => (
-                        <option key={b.id} value={b.id}>
+                        <option key={b.id} value={b.id} className="bg-[#0d1527] text-slate-100">
                           &nbsp;&nbsp;&nbsp;&nbsp;↳ {b.name_ar} ({b.code})
                         </option>
                       ))}
@@ -462,9 +462,9 @@ export default function CreateDocumentPage() {
             <div>
               <label className="form-label">الجهة / المؤسسة</label>
               <select name="organization_id" value={form.organization_id} onChange={handleChange}
-                      className="form-input form-select">
-                <option value="">اختر المؤسسة / الجهة...</option>
-                {organizations.map(o => <option key={o.id} value={o.id}>{o.name_ar || o.name}</option>)}
+                      className="form-input form-select bg-[#0d1527] text-slate-100">
+                <option value="" className="bg-[#0d1527] text-slate-400">اختر المؤسسة / الجهة...</option>
+                {organizations.map(o => <option key={o.id} value={o.id} className="bg-[#0d1527] text-slate-100">{o.name_ar || o.name}</option>)}
               </select>
             </div>
           </div>

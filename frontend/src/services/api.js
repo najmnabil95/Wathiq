@@ -62,11 +62,12 @@ api.interceptors.response.use(
 
 export default api;
 
-// ─── Auth ──────────────────────────────────────────────────────
 export const authAPI = {
-  login:  (data) => api.post('/auth/login', data),
-  logout: ()     => api.post('/auth/logout'),
-  me:     ()     => api.get('/auth/me'),
+  login:          (data) => api.post('/auth/login', data),
+  logout:         ()     => api.post('/auth/logout'),
+  me:             ()     => api.get('/auth/me'),
+  updateProfile:  (data) => api.put('/auth/profile', data),
+  changePassword: (data) => api.put('/auth/password', data),
 };
 
 // ─── Documents ─────────────────────────────────────────────────

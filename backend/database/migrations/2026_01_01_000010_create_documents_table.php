@@ -45,8 +45,9 @@ return new class extends Migration
             $table->index('assigned_to');
             $table->index('document_date');
             $table->index('is_archived');
-            $table->index('created_at');
-            $table->fullText(['title', 'description', 'notes']); // Full-text search
+            if (\Illuminate\Support\Facades\DB::getDriverName() !== 'sqlite') {
+                $table->fullText(['title', 'description', 'notes']); // Full-text search
+            }
         });
     }
 

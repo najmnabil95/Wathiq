@@ -833,16 +833,16 @@ export default function RolesPage() {
       {/* ── Modal: Create New Role ─────────────────────────────────── */}
       {isModalOpen && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md"
           style={{ direction: 'rtl', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
           onClick={() => setIsModalOpen(false)}
         >
           <div
-            className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto text-right"
+            className="bg-[#0c1427] border border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto text-right"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-slate-900/95">
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-[#0c1427]">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
                   <ShieldCheck className="w-6 h-6" />
@@ -986,7 +986,7 @@ export default function RolesPage() {
               </div>
 
               {/* Fixed Footer */}
-              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-slate-900/95 shrink-0">
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-[#0c1427] shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -1012,16 +1012,16 @@ export default function RolesPage() {
       {/* ── Modal: Edit Existing Role ───────────────────────────────── */}
       {isEditModalOpen && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md"
           style={{ direction: 'rtl', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
           onClick={() => setIsEditModalOpen(false)}
         >
           <div
-            className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto text-right"
+            className="bg-[#0c1427] border border-slate-800 rounded-3xl w-full max-w-md shadow-2xl flex flex-col max-h-[88vh] overflow-hidden my-auto text-right"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-slate-900/95">
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-[#0c1427]">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
                   <Edit3 className="w-5 h-5" />
@@ -1081,7 +1081,7 @@ export default function RolesPage() {
               </div>
 
               {/* Fixed Footer */}
-              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-slate-900/95 shrink-0">
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-[#0c1427] shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}

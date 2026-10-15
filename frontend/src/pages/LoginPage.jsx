@@ -231,8 +231,8 @@ export default function LoginPage() {
         </div>
 
         {/* Version */}
-        <p className="text-center text-[11px] mt-4" style={{ color: '#1e3050' }}>
-          IT-EDMS v1.0 &mdash; قسم تقنية المعلومات والأنظمة
+        <p className="text-center text-[11px] mt-4" style={{ color: '#385072' }}>
+          IT-EDMS v2.4 Enterprise &mdash; قسم تقنية المعلومات والأنظمة
         </p>
       </div>
     </div>
