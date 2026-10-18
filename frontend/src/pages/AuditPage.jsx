@@ -191,7 +191,7 @@ export default function AuditPage() {
       </div>
 
       {/* ── Audit Logs Table ───────────────────────────────────────── */}
-      <div className="bg-slate-900/60 rounded-2xl border border-slate-800 overflow-hidden backdrop-blur-md">
+      <div className="glass overflow-hidden">
         {loading ? (
           <div className="flex flex-col items-center justify-center p-16 text-slate-400">
             <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3" />
@@ -204,7 +204,7 @@ export default function AuditPage() {
           </div>
         ) : (
           <div className="table-responsive">
-            <table className="w-full text-right text-sm min-w-[720px]">
+            <table className="data-table w-full text-right text-sm min-w-[720px]">
               <thead className="bg-slate-950/60 border-b border-slate-800 text-xs font-semibold text-slate-400">
                 <tr>
                   <th className="p-4">نوع العملية</th>

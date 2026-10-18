@@ -280,40 +280,48 @@ export default function DepartmentsPage() {
 
       {/* ── Top Stats Cards ────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-slate-900/60 border border-slate-800 p-4 rounded-2xl backdrop-blur-sm">
+        <div className="glass card-hover-lift glow-on-hover p-4 rounded-2xl group flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
-            <span>الإدارات والأقسام الرئيسية</span>
-            <Building2 className="w-4 h-4 text-blue-400" />
+            <span className="group-hover:text-blue-300 transition-colors">الإدارات والأقسام الرئيسية</span>
+            <div className="w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400 transition-transform duration-300 group-hover:scale-110">
+              <Building2 className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl font-bold text-white">{rootDepartments.length}</div>
-          <span className="text-[11px] text-blue-400/80 font-medium">مستوى قيادي مركزي</span>
+          <div className="text-2xl font-bold text-white font-mono">{rootDepartments.length}</div>
+          <span className="text-[11px] text-blue-400/80 font-medium mt-1">مستوى قيادي مركزي</span>
         </div>
 
-        <div className="bg-slate-900/60 border border-slate-800 p-4 rounded-2xl backdrop-blur-sm">
+        <div className="glass card-hover-lift glow-on-hover p-4 rounded-2xl group flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
-            <span>الفروع والوحدات التابعة</span>
-            <GitFork className="w-4 h-4 text-emerald-400" />
+            <span className="group-hover:text-emerald-300 transition-colors">الفروع والوحدات التابعة</span>
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-400 transition-transform duration-300 group-hover:scale-110">
+              <GitFork className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl font-bold text-emerald-400">{totalBranchesCount}</div>
-          <span className="text-[11px] text-emerald-400/80 font-medium">موزعة على الأقسام</span>
+          <div className="text-2xl font-bold text-emerald-400 font-mono">{totalBranchesCount}</div>
+          <span className="text-[11px] text-emerald-400/80 font-medium mt-1">موزعة على الأقسام</span>
         </div>
 
-        <div className="bg-slate-900/60 border border-slate-800 p-4 rounded-2xl backdrop-blur-sm">
+        <div className="glass card-hover-lift glow-on-hover p-4 rounded-2xl group flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
-            <span>الوثائق المرتبطة</span>
-            <FileText className="w-4 h-4 text-amber-400" />
+            <span className="group-hover:text-amber-300 transition-colors">الوثائق المرتبطة</span>
+            <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-amber-400 transition-transform duration-300 group-hover:scale-110">
+              <FileText className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl font-bold text-amber-400">{totalDocsCount}</div>
-          <span className="text-[11px] text-amber-400/80 font-medium">وثيقة مؤرشفة</span>
+          <div className="text-2xl font-bold text-amber-400 font-mono">{totalDocsCount}</div>
+          <span className="text-[11px] text-amber-400/80 font-medium mt-1">وثيقة مؤرشفة</span>
         </div>
 
-        <div className="bg-slate-900/60 border border-slate-800 p-4 rounded-2xl backdrop-blur-sm">
+        <div className="glass card-hover-lift glow-on-hover p-4 rounded-2xl group flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
-            <span>الكوادر والموظفون</span>
-            <Users className="w-4 h-4 text-indigo-400" />
+            <span className="group-hover:text-indigo-300 transition-colors">الكوادر والموظفون</span>
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-400 transition-transform duration-300 group-hover:scale-110">
+              <Users className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl font-bold text-indigo-400">{totalUsersCount}</div>
-          <span className="text-[11px] text-indigo-400/80 font-medium">مستخدم ومسؤول</span>
+          <div className="text-2xl font-bold text-indigo-400 font-mono">{totalUsersCount}</div>
+          <span className="text-[11px] text-indigo-400/80 font-medium mt-1">مستخدم ومسؤول</span>
         </div>
       </div>
 
@@ -380,14 +388,14 @@ export default function DepartmentsPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredRoots.map(root => {
+          {filteredRoots.map((root, idx) => {
             const branches = branchesMap[root.id] || [];
             const isExpanded = !!expandedDepts[root.id];
 
             return (
               <div
                 key={root.id}
-                className="bg-slate-900/60 rounded-2xl border border-slate-800 overflow-hidden backdrop-blur-md transition-all hover:border-slate-700/80 shadow-lg shadow-black/20"
+                className={`glass card-hover-lift rounded-2xl overflow-hidden backdrop-blur-md transition-all border border-slate-800 hover:border-blue-500/30 shadow-lg shadow-black/20 animate-fade-in stagger-${(idx % 5) + 1}`}
               >
                 {/* ── Root Department Row ── */}
                 <div className="p-4 sm:p-5 flex items-center justify-between gap-4 bg-slate-950/40 border-b border-slate-800/80">
