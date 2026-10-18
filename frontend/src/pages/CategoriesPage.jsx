@@ -13,6 +13,8 @@ import toast from 'react-hot-toast';
 export default function CategoriesPage() {
   const navigate = useNavigate();
   const { user, hasPermission } = useAuthStore();
+  const isSuperAdmin = user?.is_super_admin || user?.roles?.some(r => r.name === 'super_admin');
+  const canManage = isSuperAdmin || hasPermission('categories.manage');
 
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -144,13 +146,15 @@ export default function CategoriesPage() {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreate}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition shadow-lg shadow-blue-600/20"
-        >
-          <Plus className="w-4 h-4" />
-          إضافة تصنيف جديد
-        </button>
+        {canManage && (
+          <button
+            onClick={handleOpenCreate}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition shadow-lg shadow-blue-600/20 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            إضافة تصنيف جديد
+          </button>
+        )}
       </div>
 
       {/* ── Search Bar & Stats ─────────────────────────────────────── */}
@@ -184,48 +188,55 @@ export default function CategoriesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
-          {filteredCategories.map((cat) => (
+          {filteredCategories.map((cat, idx) => (
             <div
               key={cat.id}
-              className="bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800 hover:border-slate-700/80 rounded-2xl p-5 transition flex flex-col justify-between group backdrop-blur-md"
+              className={`glass card-hover-lift glow-on-hover p-5 rounded-2xl flex flex-col justify-between group animate-fade-in stagger-${(idx % 5) + 1}`}
+              style={{ border: '1px solid rgba(255,255,255,0.07)' }}
             >
               <div>
-                <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-start justify-between gap-3 mb-3 relative z-10">
                   <div className="flex items-center gap-3">
                     <div
-                      className="p-3 rounded-xl flex items-center justify-center text-white"
-                      style={{ backgroundColor: `${cat.color || '#3b82f6'}20`, color: cat.color || '#3b82f6' }}
+                      className="p-3 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-2 shadow-lg"
+                      style={{
+                        backgroundColor: `${cat.color || '#3b82f6'}18`,
+                        color: cat.color || '#3b82f6',
+                        border: `1px solid ${cat.color || '#3b82f6'}30`
+                      }}
                     >
                       <Folder className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-white text-base group-hover:text-blue-400 transition">
+                      <h3 className="font-bold text-white text-base group-hover:text-blue-400 transition-colors">
                         {cat.name_ar || cat.name}
                       </h3>
                       {cat.code && (
-                        <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                        <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-800/80 text-slate-300 border border-white/5">
                           {cat.code}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition">
-                    <button
-                      onClick={() => handleOpenEdit(cat)}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-600/30 text-slate-400 hover:text-blue-300 transition"
-                      title="تعديل التصنيف"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(cat.id, cat.name)}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-600/30 text-slate-400 hover:text-rose-300 transition"
-                      title="حذف التصنيف"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  {canManage && (
+                    <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition">
+                      <button
+                        onClick={() => handleOpenEdit(cat)}
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-600/30 text-slate-400 hover:text-blue-300 transition cursor-pointer"
+                        title="تعديل التصنيف"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(cat.id, cat.name)}
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-600/30 text-slate-400 hover:text-rose-300 transition cursor-pointer"
+                        title="حذف التصنيف"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <p className="text-xs text-slate-400 leading-relaxed line-clamp-2 min-h-[32px] mb-4">

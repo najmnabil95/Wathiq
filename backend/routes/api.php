@@ -63,12 +63,14 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
     Route::post  ('/documents/{id}/reject',  [DocumentController::class, 'reject']);
     Route::post  ('/documents/{id}/comments',[DocumentController::class, 'addComment']);
 
-    // Attachments
+    // Attachments & OCR
     Route::post  ('/documents/{id}/attachments',               [AttachmentController::class, 'store']);
     Route::get   ('/documents/{id}/attachments',               [AttachmentController::class, 'index']);
     Route::delete('/documents/{id}/attachments/{attId}',       [AttachmentController::class, 'destroy']);
     Route::get   ('/documents/{id}/attachments/{attId}/download', [AttachmentController::class, 'download']);
     Route::get   ('/documents/{id}/attachments/{attId}/preview',  [AttachmentController::class, 'preview']);
+    Route::get   ('/documents/{id}/attachments/{attId}/ocr',      [AttachmentController::class, 'getOcr']);
+    Route::post  ('/documents/{id}/attachments/{attId}/ocr',      [AttachmentController::class, 'processOcr']);
 
     // Audit Logs
     Route::get('/audit-logs',                    [AuditLogController::class, 'index']);

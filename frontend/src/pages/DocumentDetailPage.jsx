@@ -13,7 +13,8 @@ import {
   CheckCircle, XCircle, Archive, RotateCcw, Clock, Shield,
   Tag, Building2, Calendar, User, MapPin, Hash, QrCode,
   Printer, AlertCircle, FileCheck, Layers, ExternalLink, Edit3,
-  ZoomIn, ZoomOut, RotateCw, X, MessageSquare, GitBranch, Share2, Copy, Send, Check
+  ZoomIn, ZoomOut, RotateCw, X, MessageSquare, GitBranch, Share2, Copy, Send, Check,
+  Sparkles, RefreshCw, Search
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -76,6 +77,62 @@ export default function DocumentDetailPage() {
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadDescription, setUploadDescription] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+
+  // OCR modal state
+  const [ocrModal, setOcrModal] = useState({
+    open: false,
+    attachment: null,
+    text: '',
+    loading: false,
+    processing: false,
+    search: '',
+  });
+
+  const handleOpenOcrModal = async (att) => {
+    setOcrModal({
+      open: true,
+      attachment: att,
+      text: att.ocr_text || '',
+      loading: !att.ocr_text,
+      processing: false,
+      search: '',
+    });
+
+    try {
+      const res = await attachmentsAPI.getOcr(document.id, att.id);
+      const data = res.data?.data;
+      setOcrModal(prev => ({
+        ...prev,
+        text: data?.ocr_text || '',
+        loading: false,
+      }));
+    } catch (err) {
+      console.error(err);
+      setOcrModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const handleTriggerOcr = async (attId) => {
+    if (!attId) return;
+    setOcrModal(prev => ({ ...prev, processing: true }));
+    try {
+      const res = await attachmentsAPI.processOcr(document.id, attId);
+      const data = res.data?.data;
+      toast.success('تمت معالجة واستخراج النص وفهرسته بنجاح');
+      setOcrModal(prev => ({
+        ...prev,
+        text: data?.ocr_text || '',
+        processing: false,
+      }));
+      if (typeof fetchDocument === 'function') {
+        fetchDocument();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('تعذر استخراج النص من هذا الملف');
+      setOcrModal(prev => ({ ...prev, processing: false }));
+    }
+  };
 
   // Comments and quick tools
   const [newComment, setNewComment] = useState('');
@@ -478,56 +535,66 @@ export default function DocumentDetailPage() {
             </button>
             {statusName === 'pending_approval' && (
               <>
-                <button
-                  onClick={() => setApprovalModal({ open: true, type: 'approve' })}
-                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-emerald-600/20 transition"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  اعتماد
-                </button>
-                <button
-                  onClick={() => setApprovalModal({ open: true, type: 'reject' })}
-                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs sm:text-sm font-semibold transition"
-                >
-                  <XCircle className="w-4 h-4" />
-                  رفض
-                </button>
+                {(user?.is_super_admin || hasPermission('documents.approve')) && (
+                  <button
+                    onClick={() => setApprovalModal({ open: true, type: 'approve' })}
+                    className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-emerald-600/20 transition cursor-pointer"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    اعتماد
+                  </button>
+                )}
+                {(user?.is_super_admin || hasPermission('documents.reject')) && (
+                  <button
+                    onClick={() => setApprovalModal({ open: true, type: 'reject' })}
+                    className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs sm:text-sm font-semibold transition cursor-pointer"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    رفض
+                  </button>
+                )}
               </>
             )}
 
             {statusName !== 'archived' ? (
-              <button
-                onClick={handleArchive}
-                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs sm:text-sm font-medium transition"
-              >
-                <Archive className="w-4 h-4 text-amber-400" />
-                أرشفة
-              </button>
+              (user?.is_super_admin || hasPermission('documents.archive')) && (
+                <button
+                  onClick={handleArchive}
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs sm:text-sm font-medium transition cursor-pointer"
+                >
+                  <Archive className="w-4 h-4 text-amber-400" />
+                  أرشفة
+                </button>
+              )
             ) : (
-              <button
-                onClick={handleRestore}
-                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs sm:text-sm font-medium transition"
-              >
-                <RotateCcw className="w-4 h-4 text-emerald-400" />
-                استعادة
-              </button>
+              (user?.is_super_admin || hasPermission('documents.restore')) && (
+                <button
+                  onClick={handleRestore}
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs sm:text-sm font-medium transition cursor-pointer"
+                >
+                  <RotateCcw className="w-4 h-4 text-emerald-400" />
+                  استعادة
+                </button>
+              )
             )}
 
-            <button
-              onClick={() => {
-                setEditForm({
-                  title: document.title || '',
-                  description: document.description || '',
-                  notes: document.notes || '',
-                });
-                setEditModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs sm:text-sm font-medium transition"
-              title="تعديل بيانات الوثيقة"
-            >
-              <Edit3 className="w-4 h-4 text-blue-400" />
-              تعديل
-            </button>
+            {(user?.is_super_admin || hasPermission('documents.update')) && (
+              <button
+                onClick={() => {
+                  setEditForm({
+                    title: document.title || '',
+                    description: document.description || '',
+                    notes: document.notes || '',
+                  });
+                  setEditModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs sm:text-sm font-medium transition cursor-pointer"
+                title="تعديل بيانات الوثيقة"
+              >
+                <Edit3 className="w-4 h-4 text-blue-400" />
+                تعديل
+              </button>
+            )}
 
             <button
               onClick={handlePrintReport}
@@ -899,39 +966,41 @@ export default function DocumentDetailPage() {
       {activeTab === 'attachments' && (
         <div className="space-y-6">
           {/* Upload Form */}
-          <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-6 backdrop-blur-md">
-            <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-              <Upload className="w-5 h-5 text-blue-400" />
-              إرفاق ملف جديد للوثيقة
-            </h3>
-            <form onSubmit={handleUploadAttachment} className="flex flex-col sm:flex-row gap-4 items-end">
-              <div className="flex-1 w-full">
-                <label className="block text-xs font-semibold text-slate-400 mb-2">اختر الملف (PDF, DOCX, XLSX, PNG, JPG)</label>
-                <input
-                  type="file"
-                  onChange={(e) => setUploadFile(e.target.files[0])}
-                  className="w-full text-xs text-slate-300 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer bg-slate-950/60 rounded-xl border border-slate-800 p-2"
-                />
-              </div>
-              <div className="flex-1 w-full">
-                <label className="block text-xs font-semibold text-slate-400 mb-2">ملاحظة أو وصف المرفق</label>
-                <input
-                  type="text"
-                  placeholder="مثال: النسخة الموقعة إلكترونياً"
-                  value={uploadDescription}
-                  onChange={(e) => setUploadDescription(e.target.value)}
-                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={isUploading}
-                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition shadow-lg shadow-blue-600/20 disabled:opacity-50 shrink-0"
-              >
-                {isUploading ? 'جاري الرفع...' : 'رفع المرفق'}
-              </button>
-            </form>
-          </div>
+          {(user?.is_super_admin || hasPermission('attachments.upload')) && (
+            <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-6 backdrop-blur-md">
+              <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+                <Upload className="w-5 h-5 text-blue-400" />
+                إرفاق ملف جديد للوثيقة
+              </h3>
+              <form onSubmit={handleUploadAttachment} className="flex flex-col sm:flex-row gap-4 items-end">
+                <div className="flex-1 w-full">
+                  <label className="block text-xs font-semibold text-slate-400 mb-2">اختر الملف (PDF, DOCX, XLSX, PNG, JPG)</label>
+                  <input
+                    type="file"
+                    onChange={(e) => setUploadFile(e.target.files[0])}
+                    className="w-full text-xs text-slate-300 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer bg-slate-950/60 rounded-xl border border-slate-800 p-2"
+                  />
+                </div>
+                <div className="flex-1 w-full">
+                  <label className="block text-xs font-semibold text-slate-400 mb-2">ملاحظة أو وصف المرفق</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: النسخة الموقعة إلكترونياً"
+                    value={uploadDescription}
+                    onChange={(e) => setUploadDescription(e.target.value)}
+                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isUploading}
+                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition shadow-lg shadow-blue-600/20 disabled:opacity-50 shrink-0 cursor-pointer"
+                >
+                  {isUploading ? 'جاري الرفع...' : 'رفع المرفق'}
+                </button>
+              </form>
+            </div>
+          )}
 
           {/* List of Attachments */}
           <div className="bg-slate-900/60 rounded-2xl border border-slate-800 overflow-hidden backdrop-blur-md">
@@ -993,20 +1062,34 @@ export default function DocumentDetailPage() {
                         <Eye className="w-3.5 h-3.5" />
                         <span>استعراض</span>
                       </button>
+
                       <button
-                        onClick={() => handleDownloadAttachment(att.id, att.file_name || att.original_name)}
-                        className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
-                        title="تحميل الملف"
+                        onClick={() => handleOpenOcrModal(att)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 border border-emerald-500/25 text-xs font-semibold transition cursor-pointer"
+                        title="استعراض النص المفهرس وفحص OCR"
                       >
-                        <Download className="w-4 h-4" />
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>نص OCR</span>
                       </button>
-                      <button
-                        onClick={() => handleDeleteAttachment(att.id)}
-                        className="p-2 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white transition"
-                        title="حذف الملف"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+
+                      {(user?.is_super_admin || hasPermission('attachments.download')) && (
+                        <button
+                          onClick={() => handleDownloadAttachment(att.id, att.file_name || att.original_name)}
+                          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                          title="تحميل الملف"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                      )}
+                      {(user?.is_super_admin || hasPermission('attachments.delete')) && (
+                        <button
+                          onClick={() => handleDeleteAttachment(att.id)}
+                          className="p-2 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white transition cursor-pointer"
+                          title="حذف الملف"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1089,31 +1172,33 @@ export default function DocumentDetailPage() {
       {activeTab === 'comments' && (
         <div className="space-y-6">
           {/* Add Comment Box */}
-          <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-6 backdrop-blur-md">
-            <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-amber-400" />
-              إضافة توجيه أو ملاحظة إدارية
-            </h3>
-            <form onSubmit={handleAddComment} className="space-y-3">
-              <textarea
-                rows={3}
-                placeholder="اكتب توجيهاتك أو ملاحظاتك الإدارية حول هذه الوثيقة..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 resize-none transition"
-              />
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={submittingComment || !newComment.trim()}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition shadow-lg shadow-blue-600/20 disabled:opacity-50 cursor-pointer"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  {submittingComment ? 'جاري الإرسال...' : 'إرسال الملاحظة'}
-                </button>
-              </div>
-            </form>
-          </div>
+          {(user?.is_super_admin || hasPermission('comments.create')) && (
+            <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-6 backdrop-blur-md">
+              <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-amber-400" />
+                إضافة توجيه أو ملاحظة إدارية
+              </h3>
+              <form onSubmit={handleAddComment} className="space-y-3">
+                <textarea
+                  rows={3}
+                  placeholder="اكتب توجيهاتك أو ملاحظاتك الإدارية حول هذه الوثيقة..."
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 resize-none transition"
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={submittingComment || !newComment.trim()}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition shadow-lg shadow-blue-600/20 disabled:opacity-50 cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    {submittingComment ? 'جاري الإرسال...' : 'إرسال الملاحظة'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
 
           {/* Comments List */}
           <div className="bg-slate-900/60 rounded-2xl border border-slate-800 overflow-hidden backdrop-blur-md">
@@ -2029,6 +2114,115 @@ export default function DocumentDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* ── OCR EXTRACTED TEXT MODAL ─────────────────────────────────── */}
+      {ocrModal.open && typeof window !== 'undefined' && window.document?.body && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 bg-slate-950/85 backdrop-blur-md animate-fade-in text-right"
+          style={{ direction: 'rtl' }}
+          onClick={() => setOcrModal({ ...ocrModal, open: false })}
+        >
+          <div
+            className="bg-[#0c1427] border border-slate-800 rounded-3xl w-full max-w-3xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#080d19] shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    النص المفهرس والتعرف الضوئي (OCR / Full-Text)
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono mt-0.5 truncate max-w-md">
+                    {ocrModal.attachment?.original_name || ocrModal.attachment?.file_name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOcrModal({ ...ocrModal, open: false })}
+                className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Search within OCR text toolbar */}
+            <div className="p-4 border-b border-slate-800/80 bg-slate-900/40 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="بحث سريع داخل النص المستخرج..."
+                  value={ocrModal.search}
+                  onChange={(e) => setOcrModal({ ...ocrModal, search: e.target.value })}
+                  className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pr-9 pl-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
+                <span>الكلمات: <strong className="text-slate-200">{ocrModal.text ? ocrModal.text.trim().split(/\s+/).length : 0}</strong></span>
+                <span>•</span>
+                <span>الحروف: <strong className="text-slate-200">{ocrModal.text ? ocrModal.text.length : 0}</strong></span>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              {ocrModal.loading ? (
+                <div className="flex flex-col items-center justify-center py-16 space-y-3">
+                  <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
+                  <p className="text-xs text-slate-400">جاري فحص وقراءة النص المفهرس...</p>
+                </div>
+              ) : !ocrModal.text ? (
+                <div className="p-12 text-center text-slate-500 bg-slate-950/40 rounded-2xl border border-dashed border-slate-800 space-y-3">
+                  <Sparkles className="w-10 h-10 mx-auto text-slate-600" />
+                  <p className="text-sm font-semibold text-slate-400">لم يتم استخراج نص بعد من هذا المرفق</p>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    إذا كان هذا الملف عبارة عن مستند مسح ضوئي أو صورة أو ملف PDF، يمكنك الضغط على زر "إعادة الاستخراج وفحص OCR" أدناه.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 overflow-x-auto text-xs font-mono text-slate-200 whitespace-pre-wrap leading-relaxed max-h-[50vh] select-text">
+                  {ocrModal.text}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800 bg-[#080d19] shrink-0">
+              <button
+                type="button"
+                onClick={() => handleTriggerOcr(ocrModal.attachment?.id)}
+                disabled={ocrModal.processing}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition border border-slate-700 disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${ocrModal.processing ? 'animate-spin text-emerald-400' : ''}`} />
+                <span>{ocrModal.processing ? 'جاري الفحص...' : 'إعادة الاستخراج / فحص OCR'}</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!ocrModal.text}
+                  onClick={() => {
+                    navigator.clipboard.writeText(ocrModal.text);
+                    toast.success('تم نسخ النص المستخرج إلى الحافظة');
+                  }}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition shadow-lg shadow-emerald-600/20 disabled:opacity-50 cursor-pointer"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>نسخ النص الكامل</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        window.document.body
+      )}
     </div>
   );
 }

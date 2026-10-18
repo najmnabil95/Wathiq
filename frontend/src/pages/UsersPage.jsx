@@ -348,42 +348,42 @@ export default function UsersPage() {
 
       {/* ── KPI Stat Cards ─────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-slate-900/50 border border-slate-800/90 rounded-2xl p-4 flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+        <div className="glass card-hover-lift glow-on-hover p-4 flex items-center gap-3.5 group">
+          <div className="w-11 h-11 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 shadow-lg">
             <Users className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-xs text-slate-400 font-medium">إجمالي المستخدمين</div>
+            <div className="text-xs text-slate-400 font-medium group-hover:text-blue-300 transition-colors">إجمالي المستخدمين</div>
             <div className="text-xl font-black text-white font-mono mt-0.5">{totalUsersCount}</div>
           </div>
         </div>
 
-        <div className="bg-slate-900/50 border border-slate-800/90 rounded-2xl p-4 flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+        <div className="glass card-hover-lift glow-on-hover p-4 flex items-center gap-3.5 group">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 shadow-lg">
             <UserCheck className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-xs text-slate-400 font-medium">الحسابات النشطة</div>
+            <div className="text-xs text-slate-400 font-medium group-hover:text-emerald-300 transition-colors">الحسابات النشطة</div>
             <div className="text-xl font-black text-emerald-400 font-mono mt-0.5">{activeUsersCount}</div>
           </div>
         </div>
 
-        <div className="bg-slate-900/50 border border-slate-800/90 rounded-2xl p-4 flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+        <div className="glass card-hover-lift glow-on-hover p-4 flex items-center gap-3.5 group">
+          <div className="w-11 h-11 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 shadow-lg">
             <Shield className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-xs text-slate-400 font-medium">الإدارة والتحكم</div>
+            <div className="text-xs text-slate-400 font-medium group-hover:text-purple-300 transition-colors">الإدارة والتحكم</div>
             <div className="text-xl font-black text-purple-400 font-mono mt-0.5">{adminManagersCount}</div>
           </div>
         </div>
 
-        <div className="bg-slate-900/50 border border-slate-800/90 rounded-2xl p-4 flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+        <div className="glass card-hover-lift glow-on-hover p-4 flex items-center gap-3.5 group">
+          <div className="w-11 h-11 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 shadow-lg">
             <Building2 className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-xs text-slate-400 font-medium">مسؤولو الأرشفة والدعم</div>
+            <div className="text-xs text-slate-400 font-medium group-hover:text-amber-300 transition-colors">مسؤولو الأرشفة والدعم</div>
             <div className="text-xl font-black text-amber-400 font-mono mt-0.5">{staffCount}</div>
           </div>
         </div>

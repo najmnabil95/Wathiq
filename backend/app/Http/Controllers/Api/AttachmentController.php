@@ -174,6 +174,74 @@ class AttachmentController extends Controller
         return response()->json(['success' => true, 'message' => 'تم حذف الملف.']);
     }
 
+    /**
+     * GET /api/v1/documents/{docId}/attachments/{attId}/ocr
+     * Retrieve OCR status and extracted text for an attachment.
+     */
+    public function getOcr(Request $request, int $docId, int $attId): JsonResponse
+    {
+        $this->checkPermission('documents.view');
+
+        $attachment = DocumentAttachment::where('document_id', $docId)->findOrFail($attId);
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'id'              => $attachment->id,
+                'file_name'       => $attachment->file_name,
+                'original_name'   => $attachment->original_name,
+                'ocr_status'      => $attachment->ocr_status,
+                'ocr_text'        => $attachment->ocr_text,
+                'word_count'      => !empty($attachment->ocr_text) ? str_word_count($attachment->ocr_text) : 0,
+                'character_count' => !empty($attachment->ocr_text) ? mb_strlen($attachment->ocr_text) : 0,
+            ],
+        ]);
+    }
+
+    /**
+     * POST /api/v1/documents/{docId}/attachments/{attId}/ocr
+     * Trigger server OCR or store client-side OCR extraction.
+     */
+    public function processOcr(Request $request, int $docId, int $attId, \App\Services\TextExtractionService $extractor): JsonResponse
+    {
+        $this->checkPermission('attachments.upload');
+
+        $document   = Document::findOrFail($docId);
+        $attachment = DocumentAttachment::where('document_id', $docId)->findOrFail($attId);
+
+        if ($request->filled('ocr_text')) {
+            $cleaned = $extractor->cleanText($request->input('ocr_text'));
+            $attachment->update([
+                'ocr_text'   => $cleaned,
+                'ocr_status' => 'done',
+            ]);
+        } else {
+            $extractor->extractAndStore($attachment);
+        }
+
+        $attachment->refresh();
+
+        $this->auditService->log(
+            'ocr.process',
+            $document,
+            null,
+            ['attachment_id' => $attachment->id, 'status' => $attachment->ocr_status],
+            "معالجة واستخراج النص (OCR) للمرفق: {$attachment->original_name}"
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم استخراج وفهرسة النص بنجاح.',
+            'data'    => [
+                'id'              => $attachment->id,
+                'ocr_status'      => $attachment->ocr_status,
+                'ocr_text'        => $attachment->ocr_text,
+                'word_count'      => !empty($attachment->ocr_text) ? str_word_count($attachment->ocr_text) : 0,
+                'character_count' => !empty($attachment->ocr_text) ? mb_strlen($attachment->ocr_text) : 0,
+            ],
+        ]);
+    }
+
     private function checkPermission(string $perm): void
     {
         if (!request()->user()->hasPermission($perm) && !request()->user()->isSuperAdmin()) {

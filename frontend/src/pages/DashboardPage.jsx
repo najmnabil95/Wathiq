@@ -45,29 +45,27 @@ function StatCard({ icon: Icon, label, value, sub, color, delay = 0, onClick }) 
   return (
     <div
       onClick={onClick}
-      className={`glass stat-card p-4 sm:p-5 animate-fade-in stagger-${delay} press-effect group ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
-      style={{ transition: 'all 0.22s cubic-bezier(0.4,0,0.2,1)' }}
+      className={`glass stat-card card-hover-lift glow-on-hover p-4 sm:p-5 animate-fade-in stagger-${delay} press-effect group ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3 relative z-10">
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] sm:text-xs font-semibold mb-1.5 uppercase tracking-wider text-slate-400">
+          <p className="text-[11px] sm:text-xs font-semibold mb-1.5 uppercase tracking-wider text-slate-400 group-hover:text-blue-300 transition-colors">
             {label}
           </p>
-          <p className="text-2xl sm:text-3xl font-black text-white" style={{ lineHeight: 1 }}>
+          <p className="text-2xl sm:text-3xl font-black text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-blue-200 transition-all" style={{ lineHeight: 1 }}>
             {value ?? <span className="skeleton inline-block w-12 h-7 rounded" />}
           </p>
-          {sub && <p className="text-[11px] mt-2 text-slate-400">{sub}</p>}
+          {sub && <p className="text-[11px] mt-2 text-slate-400 group-hover:text-slate-300 transition-colors">{sub}</p>}
         </div>
         <div
-          className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+          className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-lg"
           style={{
-            background: `rgba(${color},0.14)`,
-            border: `1px solid rgba(${color},0.22)`,
-            boxShadow: `0 0 20px rgba(${color},0.08)`,
-            transition: 'all 0.22s ease',
+            background: `rgba(${color},0.16)`,
+            border: `1px solid rgba(${color},0.3)`,
+            boxShadow: `0 0 20px rgba(${color},0.12)`,
           }}
         >
-          <Icon className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: `rgb(${color})` }} />
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300 group-hover:scale-110" style={{ color: `rgb(${color})` }} />
         </div>
       </div>
     </div>
@@ -511,36 +509,29 @@ function QuickTile({ label, value, icon: Icon, color, to }) {
   return (
     <button
       onClick={() => navigate(to)}
-      className="glass press-effect text-right p-3 sm:p-4 rounded-xl sm:rounded-2xl w-full group"
+      className="glass card-hover-lift glow-on-hover press-effect text-right p-3 sm:p-4 rounded-xl sm:rounded-2xl w-full group relative overflow-hidden"
       style={{
-        border: 'none',
+        border: '1px solid rgba(255,255,255,0.07)',
         outline: 'none',
-        transition: 'all 0.2s cubic-bezier(0.4,0,0.2,1)',
         cursor: 'pointer',
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.background = `rgba(${color},0.06)`;
-        e.currentTarget.style.boxShadow = `0 0 24px rgba(${color},0.08)`;
-        e.currentTarget.style.borderColor = `rgba(${color},0.18)`;
-        e.currentTarget.style.transform = 'translateY(-2px)';
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.background = '';
-        e.currentTarget.style.boxShadow = '';
-        e.currentTarget.style.borderColor = '';
-        e.currentTarget.style.transform = '';
       }}
     >
       <div
-        className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center mb-2.5"
-        style={{ background: `rgba(${color},0.13)`, border: `1px solid rgba(${color},0.2)` }}
+        className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center mb-2.5 transition-transform duration-300 group-hover:scale-115 group-hover:-rotate-3"
+        style={{
+          background: `rgba(${color},0.15)`,
+          border: `1px solid rgba(${color},0.28)`,
+          boxShadow: `0 0 15px rgba(${color},0.1)`,
+        }}
       >
-        <Icon size={15} style={{ color: `rgb(${color})` }} />
+        <Icon size={16} style={{ color: `rgb(${color})` }} />
       </div>
-      <div className="text-xl sm:text-2xl font-black mb-1 text-white">
+      <div className="text-xl sm:text-2xl font-black mb-1 text-white group-hover:text-blue-300 transition-colors">
         {value ?? 0}
       </div>
-      <div className="text-[11px] sm:text-xs leading-tight text-slate-400">{label}</div>
+      <div className="text-[11px] sm:text-xs leading-tight text-slate-400 group-hover:text-slate-200 transition-colors font-medium">
+        {label}
+      </div>
     </button>
   );
 }
@@ -548,7 +539,7 @@ function QuickTile({ label, value, icon: Icon, color, to }) {
 // ── Main Page ────────────────────────────────────────────────
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { user }  = useAuthStore();
+  const { user, hasPermission } = useAuthStore();
 
   const [statsData,        setStatsData]        = useState(null);
   const [recentDocs,       setRecentDocs]       = useState([]);
@@ -636,14 +627,16 @@ export default function DashboardPage() {
             <FolderOpen size={15} />
             استعراض الأرشيف
           </button>
-          <button
-            id="dashboard-create-btn"
-            className="btn btn-primary"
-            onClick={() => navigate('/documents/create')}
-          >
-            <Plus size={16} />
-            وثيقة جديدة
-          </button>
+          {(user?.is_super_admin || hasPermission('documents.create')) && (
+            <button
+              id="dashboard-create-btn"
+              className="btn btn-primary"
+              onClick={() => navigate('/documents/create')}
+            >
+              <Plus size={16} />
+              وثيقة جديدة
+            </button>
+          )}
         </div>
       </div>
 

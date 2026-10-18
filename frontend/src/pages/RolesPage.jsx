@@ -31,7 +31,9 @@ const MODULE_ICONS = {
 };
 
 export default function RolesPage() {
-  const { user: currentUser } = useAuthStore();
+  const { user: currentUser, hasPermission } = useAuthStore();
+  const isSuperAdmin = currentUser?.is_super_admin || currentUser?.roles?.some(r => r.name === 'super_admin');
+  const canManage = isSuperAdmin || hasPermission('roles.manage');
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -119,7 +121,7 @@ export default function RolesPage() {
 
   // Toggle single permission
   const togglePermission = (permName) => {
-    if (selectedRole?.name === 'super_admin') return;
+    if (!canManage || selectedRole?.name === 'super_admin') return;
 
     setSelectedPermissions((prev) => {
       const next = new Set(prev);
@@ -134,7 +136,7 @@ export default function RolesPage() {
 
   // Toggle all permissions within a module
   const toggleModuleAll = (modulePerms) => {
-    if (selectedRole?.name === 'super_admin') return;
+    if (!canManage || selectedRole?.name === 'super_admin') return;
 
     const modulePermNames = modulePerms.map((p) => p.name);
     const allSelected = modulePermNames.every((name) => selectedPermissions.has(name));
@@ -152,7 +154,7 @@ export default function RolesPage() {
 
   // Global Select All / Clear All
   const handleSelectAll = () => {
-    if (selectedRole?.name === 'super_admin') return;
+    if (!canManage || selectedRole?.name === 'super_admin') return;
     const all = new Set();
     treeData.modules.forEach((mod) => {
       mod.permissions.forEach((p) => all.add(p.name));
@@ -161,7 +163,7 @@ export default function RolesPage() {
   };
 
   const handleDeselectAll = () => {
-    if (selectedRole?.name === 'super_admin') return;
+    if (!canManage || selectedRole?.name === 'super_admin') return;
     setSelectedPermissions(new Set());
   };
 
@@ -414,15 +416,17 @@ export default function RolesPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-lg shadow-blue-600/20 transition cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            إنشاء دور وظيفي جديد
-          </button>
-        </div>
+        {canManage && (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-lg shadow-blue-600/20 transition cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              إنشاء دور وظيفي جديد
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Mobile / Tablet Segmented Switcher (< 1024px) */}
@@ -505,7 +509,7 @@ export default function RolesPage() {
                         </div>
                       </div>
 
-                      {!isSystem && (
+                      {!isSystem && canManage && (
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
                           <button
                             type="button"
@@ -578,7 +582,13 @@ export default function RolesPage() {
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
-                {!isSuperAdminRole && (
+                {!canManage && (
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    <Lock className="w-3.5 h-3.5" />
+                    معاينة فقط (للقراءة)
+                  </span>
+                )}
+                {!isSuperAdminRole && canManage && (
                   <button
                     onClick={handleSavePermissions}
                     disabled={!hasChanges || saving}
@@ -738,7 +748,7 @@ export default function RolesPage() {
                           {selectedInModule} / {module.permissions.length}
                         </span>
 
-                        {!isSuperAdminRole && (
+                        {!isSuperAdminRole && canManage && (
                           <button
                             type="button"
                             onClick={() => toggleModuleAll(module.permissions)}
@@ -781,9 +791,13 @@ export default function RolesPage() {
                               onClick={() => togglePermission(perm.name)}
                               className={`p-3 rounded-xl border transition flex items-start gap-3 select-none ${isSuperAdminRole
                                   ? 'bg-slate-900/40 border-slate-800/60 opacity-90'
-                                  : isChecked
-                                    ? 'bg-blue-600/10 border-blue-500/40 hover:bg-blue-600/15 cursor-pointer'
-                                    : 'bg-slate-950/40 border-slate-800/80 hover:bg-slate-800/40 hover:border-slate-700 cursor-pointer'
+                                  : !canManage
+                                    ? isChecked
+                                      ? 'bg-blue-600/10 border-blue-500/25 cursor-default opacity-85'
+                                      : 'bg-slate-950/40 border-slate-800/60 cursor-default opacity-50'
+                                    : isChecked
+                                      ? 'bg-blue-600/10 border-blue-500/40 hover:bg-blue-600/15 cursor-pointer'
+                                      : 'bg-slate-950/40 border-slate-800/80 hover:bg-slate-800/40 hover:border-slate-700 cursor-pointer'
                                 }`}
                             >
                               <div className="mt-0.5">

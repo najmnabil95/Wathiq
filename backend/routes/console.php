@@ -62,3 +62,59 @@ Artisan::command('edms:check', function () {
         $this->warn("\n [ATTENTION] Please review the items marked above before opening to users.");
     }
 })->purpose('Verify IT-EDMS system status and deployment readiness');
+
+/**
+ * Batch OCR indexing command for attachments
+ */
+Artisan::command('edms:ocr-index {--force : Re-index already processed attachments}', function () {
+    $this->info("=================================================");
+    $this->info(" IT-EDMS: Full-Text OCR & Attachment Indexing");
+    $this->info("=================================================");
+
+    $force = $this->option('force');
+    $query = \App\Models\DocumentAttachment::query();
+
+    if (!$force) {
+        $query->where(function ($q) {
+            $q->whereNull('ocr_text')
+              ->orWhere('ocr_status', 'pending');
+        });
+    }
+
+    $attachments = $query->get();
+    $total = $attachments->count();
+
+    if ($total === 0) {
+        $this->info("All attachments are already indexed. Use --force to re-index.");
+        return;
+    }
+
+    $this->info("Found {$total} attachment(s) to process...\n");
+    $bar = $this->output->createProgressBar($total);
+    $bar->start();
+
+    $extractor = new \App\Services\TextExtractionService();
+    $success = 0;
+    $failed = 0;
+
+    foreach ($attachments as $att) {
+        $res = $extractor->extractAndStore($att);
+        if ($res) {
+            $success++;
+        } else {
+            $failed++;
+        }
+        $bar->advance();
+    }
+
+    $bar->finish();
+    $this->info("\n\n [INDEXING COMPLETE]");
+    $this->table(
+        ['Metric', 'Value'],
+        [
+            ['Total Processed', $total],
+            ['Successfully Extracted', $success],
+            ['Pending / Not Text-Based', $failed],
+        ]
+    );
+})->purpose('Extract text and index attachments for smart full-text search');

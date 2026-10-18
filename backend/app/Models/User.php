@@ -93,10 +93,22 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user is super admin.
+     */
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasRole('super_admin');
+    }
+
+    /**
      * Check if user has a specific permission (directly or via role).
      */
     public function hasPermission(string $permission): bool
     {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         foreach ($this->roles as $role) {
             if ($role->permissions->contains('name', $permission)) {
                 return true;
@@ -106,11 +118,37 @@ class User extends Authenticatable
     }
 
     /**
-     * Check if user is super admin.
+     * Check if user has at least one of the specified permissions.
      */
-    public function isSuperAdmin(): bool
+    public function hasAnyPermission(array $permissions): bool
     {
-        return $this->hasRole('super_admin');
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        foreach ($permissions as $permission) {
+            if ($this->hasPermission($permission)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if user has all of the specified permissions.
+     */
+    public function hasAllPermissions(array $permissions): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        foreach ($permissions as $permission) {
+            if (!$this->hasPermission($permission)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // ─── Scopes ───────────────────────────────────────────────────

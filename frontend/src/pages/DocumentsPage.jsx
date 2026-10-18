@@ -8,7 +8,8 @@ import {
   SlidersHorizontal, X, CheckCircle2, Clock, XCircle,
   ArrowUpDown, ArrowUp, ArrowDown, Printer, FileSpreadsheet,
   Building2, ChevronDown, Layers,
-  Shield, QrCode, ExternalLink, FileCheck, AlertCircle, ZoomIn, ZoomOut, RotateCw
+  Shield, QrCode, ExternalLink, FileCheck, AlertCircle, ZoomIn, ZoomOut, RotateCw,
+  Sparkles
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
@@ -685,7 +686,7 @@ export default function DocumentsPage() {
               id="documents-search"
               type="text"
               className="form-input"
-              placeholder="ابحث بالرقم، العنوان، الوصف، أو الكلمات المفتاحية..."
+              placeholder="بحث ذكي: بالرقم، العنوان، الوصف، أو محتوى المرفقات الممسوحة ضوئياً (OCR)..."
               value={filters.q}
               onChange={e => handleFilterChange('q', e.target.value)}
             />
@@ -976,6 +977,20 @@ export default function DocumentsPage() {
                             : doc.department.name_ar}
                         </p>
                       )}
+                      {doc.search_matches && doc.search_matches.length > 0 && (
+                        <div className="mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 space-y-1">
+                          <div className="flex items-center gap-1 text-[11px] font-bold text-amber-400">
+                            <Sparkles size={12} />
+                            <span>تطابق في محتوى المرفقات (OCR):</span>
+                          </div>
+                          {doc.search_matches.map((m, idx) => (
+                            <div key={idx} className="text-[11px] text-slate-300">
+                              <span className="text-amber-300 font-semibold">{m.file_name}: </span>
+                              <span className="font-mono bg-black/30 px-1 py-0.5 rounded text-[10px]">{m.snippet || 'تطابق في اسم الملف'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center justify-between pt-1 border-t border-white/5 text-xs text-slate-400">
@@ -1069,6 +1084,20 @@ export default function DocumentsPage() {
                           {doc.physical_location && (
                             <div className="text-[11px] text-slate-500 mt-0.5 font-mono">
                               موقع الحفظ: {doc.physical_location}
+                            </div>
+                          )}
+                          {doc.search_matches && doc.search_matches.length > 0 && (
+                            <div className="mt-1.5 p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 max-w-md">
+                              <div className="flex items-center gap-1 text-[10px] font-bold text-amber-400 mb-0.5">
+                                <Sparkles size={11} />
+                                <span>تطابق محتوى المرفقات (OCR):</span>
+                              </div>
+                              {doc.search_matches.slice(0, 2).map((m, idx) => (
+                                <div key={idx} className="text-[11px] text-slate-300 truncate">
+                                  <span className="text-amber-300 font-semibold">{m.file_name}: </span>
+                                  <span className="font-mono bg-black/30 px-1 py-0.2 rounded text-[10px]">{m.snippet || 'تطابق في اسم الملف'}</span>
+                                </div>
+                              ))}
                             </div>
                           )}
                         </td>

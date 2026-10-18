@@ -135,7 +135,9 @@ class Document extends Model
               ->orWhere('title', 'LIKE', "%{$term}%")
               ->orWhere('description', 'LIKE', "%{$term}%")
               ->orWhereHas('tags', fn ($tq) => $tq->where('name', 'LIKE', "%{$term}%"))
-              ->orWhereHas('creator', fn ($uq) => $uq->where('name', 'LIKE', "%{$term}%"));
+              ->orWhereHas('creator', fn ($uq) => $uq->where('name', 'LIKE', "%{$term}%"))
+              ->orWhereHas('attachments', fn ($aq) => $aq->where('ocr_text', 'LIKE', "%{$term}%")
+                                                        ->orWhere('original_name', 'LIKE', "%{$term}%"));
         });
     }
 

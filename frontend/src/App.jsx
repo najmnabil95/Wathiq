@@ -28,11 +28,31 @@ function PageLoader() {
   );
 }
 
+import UnauthorizedPage from './components/common/UnauthorizedPage';
+
 // ── Protected Route ─────────────────────────────────────────────
 function ProtectedRoute({ children }) {
   const { token, user } = useAuthStore();
   const isAuthenticated = Boolean(token && user && user.id);
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return children;
+}
+
+// ── Permission Guard for Routes ─────────────────────────────────
+function RequirePermission({ permission, any: anyPermissions, children }) {
+  const { user, hasPermission, hasAnyPermission } = useAuthStore();
+  const isSuperAdmin = user?.is_super_admin || user?.roles?.some(r => r.name === 'super_admin');
+
+  if (isSuperAdmin) return children;
+
+  if (permission && !hasPermission(permission)) {
+    return <UnauthorizedPage requiredPermission={permission} />;
+  }
+
+  if (anyPermissions && !hasAnyPermission(anyPermissions)) {
+    return <UnauthorizedPage requiredPermission={anyPermissions.join(' / ')} />;
+  }
+
   return children;
 }
 
@@ -62,16 +82,52 @@ export default function App() {
           </ProtectedRoute>
         }>
           <Route index element={<DashboardPage />} />
-          <Route path="documents"        element={<DocumentsPage />} />
-          <Route path="documents/create" element={<CreateDocumentPage />} />
-          <Route path="documents/:id"    element={<DocumentDetailPage />} />
-          <Route path="categories"       element={<CategoriesPage />} />
-          <Route path="departments"      element={<DepartmentsPage />} />
-          <Route path="users"            element={<UsersPage />} />
-          <Route path="roles"            element={<RolesPage />} />
-          <Route path="audit"            element={<AuditPage />} />
-          <Route path="settings"         element={<SettingsPage />} />
-          <Route path="profile"          element={<ProfilePage />} />
+          <Route path="documents" element={
+            <RequirePermission permission="documents.view">
+              <DocumentsPage />
+            </RequirePermission>
+          } />
+          <Route path="documents/create" element={
+            <RequirePermission permission="documents.create">
+              <CreateDocumentPage />
+            </RequirePermission>
+          } />
+          <Route path="documents/:id" element={
+            <RequirePermission permission="documents.view">
+              <DocumentDetailPage />
+            </RequirePermission>
+          } />
+          <Route path="categories" element={
+            <RequirePermission permission="categories.view">
+              <CategoriesPage />
+            </RequirePermission>
+          } />
+          <Route path="departments" element={
+            <RequirePermission permission="departments.view">
+              <DepartmentsPage />
+            </RequirePermission>
+          } />
+          <Route path="users" element={
+            <RequirePermission permission="users.view">
+              <UsersPage />
+            </RequirePermission>
+          } />
+          <Route path="roles" element={
+            <RequirePermission any={['roles.view', 'roles.manage']}>
+              <RolesPage />
+            </RequirePermission>
+          } />
+          <Route path="audit" element={
+            <RequirePermission permission="audit.view">
+              <AuditPage />
+            </RequirePermission>
+          } />
+          <Route path="settings" element={
+            <RequirePermission permission="settings.view">
+              <SettingsPage />
+            </RequirePermission>
+          } />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
 
         {/* Catch all */}

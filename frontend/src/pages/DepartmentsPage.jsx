@@ -13,7 +13,9 @@ import {
 import toast from 'react-hot-toast';
 
 export default function DepartmentsPage() {
-  const { user } = useAuthStore();
+  const { user, hasPermission } = useAuthStore();
+  const isSuperAdmin = user?.is_super_admin || user?.roles?.some(r => r.name === 'super_admin');
+  const canManage = isSuperAdmin || hasPermission('departments.manage');
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -256,22 +258,24 @@ export default function DepartmentsPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => handleOpenCreate(null)}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-semibold transition"
-          >
-            <Plus className="w-4 h-4 text-blue-400" />
-            إضافة قسم رئيسي
-          </button>
-          <button
-            onClick={() => handleOpenCreate(rootDepartments[0]?.id || null)}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-blue-600/25 transition"
-          >
-            <GitFork className="w-4 h-4" />
-            إضافة فرع داخل قسم
-          </button>
-        </div>
+        {canManage && (
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => handleOpenCreate(null)}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-semibold transition cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-blue-400" />
+              إضافة قسم رئيسي
+            </button>
+            <button
+              onClick={() => handleOpenCreate(rootDepartments[0]?.id || null)}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-blue-600/25 transition cursor-pointer"
+            >
+              <GitFork className="w-4 h-4" />
+              إضافة فرع داخل قسم
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Top Stats Cards ────────────────────────────────────────── */}
@@ -437,30 +441,34 @@ export default function DepartmentsPage() {
                       </span>
                     </div>
 
-                    <button
-                      onClick={() => handleOpenCreate(root.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition"
-                      title="إضافة فرع أو وحدة تتبع هذا القسم"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">فرع تابع</span>
-                    </button>
+                    {canManage && (
+                      <>
+                        <button
+                          onClick={() => handleOpenCreate(root.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition cursor-pointer"
+                          title="إضافة فرع أو وحدة تتبع هذا القسم"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">فرع تابع</span>
+                        </button>
 
-                    <button
-                      onClick={() => handleOpenEdit(root)}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
-                      title="تعديل بيانات القسم"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
+                        <button
+                          onClick={() => handleOpenEdit(root)}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                          title="تعديل بيانات القسم"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
 
-                    <button
-                      onClick={() => handleDelete(root)}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition"
-                      title="حذف القسم"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                        <button
+                          onClick={() => handleDelete(root)}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                          title="حذف القسم"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -522,21 +530,25 @@ export default function DepartmentsPage() {
                               {branch.documents_count || 0} وثيقة
                             </span>
 
-                            <button
-                              onClick={() => handleOpenEdit(branch)}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
-                              title="تعديل بيانات الفرع"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
+                            {canManage && (
+                              <>
+                                <button
+                                  onClick={() => handleOpenEdit(branch)}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                                  title="تعديل بيانات الفرع"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
 
-                            <button
-                              onClick={() => handleDelete(branch)}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition"
-                              title="حذف الفرع"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                                <button
+                                  onClick={() => handleDelete(branch)}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                                  title="حذف الفرع"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       ))

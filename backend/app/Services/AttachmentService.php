@@ -29,6 +29,10 @@ class AttachmentService
     private string $disk = 'local';
     private string $basePath = 'private/documents';
 
+    public function __construct(
+        private readonly TextExtractionService $textExtractor = new TextExtractionService()
+    ) {}
+
     /**
      * Store a file attachment for a document.
      */
@@ -46,7 +50,7 @@ class AttachmentService
         // Store in private disk
         $file->storeAs($storagePath, $fileName, $this->disk);
 
-        return DocumentAttachment::create([
+        $attachment = DocumentAttachment::create([
             'document_id'   => $document->id,
             'original_name' => $file->getClientOriginalName(),
             'file_name'     => $fileName,
@@ -58,6 +62,11 @@ class AttachmentService
             'checksum'      => hash_file('sha256', $file->getRealPath()),
             'uploaded_by'   => $uploadedBy,
         ]);
+
+        // Auto-extract text and index for full-text search
+        $this->textExtractor->extractAndStore($attachment);
+
+        return $attachment->fresh();
     }
 
     /**

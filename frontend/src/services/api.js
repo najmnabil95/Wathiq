@@ -94,6 +94,8 @@ export const attachmentsAPI = {
   delete:   (docId, attId) => api.delete(`/documents/${docId}/attachments/${attId}`),
   download: (docId, attId) => api.get(`/documents/${docId}/attachments/${attId}/download`, { responseType: 'blob' }),
   preview:  (docId, attId) => api.get(`/documents/${docId}/attachments/${attId}/preview`, { responseType: 'blob' }),
+  getOcr:   (docId, attId) => api.get(`/documents/${docId}/attachments/${attId}/ocr`),
+  processOcr: (docId, attId, data = {}) => api.post(`/documents/${docId}/attachments/${attId}/ocr`, data),
 };
 
 // ─── Categories ────────────────────────────────────────────────

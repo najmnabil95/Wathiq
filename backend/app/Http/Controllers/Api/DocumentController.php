@@ -66,6 +66,35 @@ class DocumentController extends Controller
         $perPage   = min((int)$request->input('per_page', 15), 500);
         $documents = $query->paginate($perPage);
 
+        // When searching, append OCR full-text match snippets
+        if ($request->filled('q')) {
+            $term = trim($request->input('q'));
+            $extractor = new \App\Services\TextExtractionService();
+
+            $documents->getCollection()->transform(function ($doc) use ($term, $extractor) {
+                $matchingAttachments = $doc->attachments()
+                    ->where(function ($aq) use ($term) {
+                        $aq->where('ocr_text', 'LIKE', "%{$term}%")
+                           ->orWhere('original_name', 'LIKE', "%{$term}%");
+                    })
+                    ->get(['id', 'original_name', 'file_name', 'ocr_status', 'ocr_text']);
+
+                $matches = [];
+                foreach ($matchingAttachments as $att) {
+                    $snippet = $extractor->generateSnippet($att->ocr_text, $term, 65);
+                    $matches[] = [
+                        'attachment_id' => $att->id,
+                        'file_name'     => $att->original_name,
+                        'snippet'       => $snippet,
+                        'matched_in'    => !empty($snippet) ? 'ocr_content' : 'filename',
+                    ];
+                }
+
+                $doc->setAttribute('search_matches', $matches);
+                return $doc;
+            });
+        }
+
         return response()->json(['success' => true, 'data' => $documents]);
     }
 

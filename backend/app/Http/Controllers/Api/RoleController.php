@@ -110,7 +110,7 @@ class RoleController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $this->authorizeAccess($request);
+        $this->authorizeView($request);
 
         $roles = Role::withCount(['permissions', 'users'])
             ->with('permissions:id,name,display_name,display_name_ar,group,risk_level')
@@ -128,7 +128,7 @@ class RoleController extends Controller
      */
     public function show(Request $request, int $id): JsonResponse
     {
-        $this->authorizeAccess($request);
+        $this->authorizeView($request);
 
         $role = Role::withCount('users')
             ->with('permissions')
@@ -145,7 +145,7 @@ class RoleController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $this->authorizeAccess($request);
+        $this->authorizeManage($request);
 
         // Sanitize machine name if supplied
         if ($request->filled('name')) {
@@ -224,7 +224,7 @@ class RoleController extends Controller
      */
     public function update(Request $request, int $id): JsonResponse
     {
-        $this->authorizeAccess($request);
+        $this->authorizeManage($request);
 
         $role = Role::findOrFail($id);
 
@@ -282,7 +282,7 @@ class RoleController extends Controller
      */
     public function destroy(Request $request, int $id): JsonResponse
     {
-        $this->authorizeAccess($request);
+        $this->authorizeManage($request);
 
         $role = Role::withCount('users')->findOrFail($id);
 
@@ -324,7 +324,7 @@ class RoleController extends Controller
      */
     public function tree(Request $request): JsonResponse
     {
-        $this->authorizeAccess($request);
+        $this->authorizeView($request);
 
         $allPermissions = Permission::orderBy('group')
             ->orderBy('id')
@@ -377,7 +377,7 @@ class RoleController extends Controller
      */
     public function permissions(Request $request): JsonResponse
     {
-        $this->authorizeAccess($request);
+        $this->authorizeView($request);
 
         return response()->json([
             'success' => true,
@@ -385,11 +385,19 @@ class RoleController extends Controller
         ]);
     }
 
-    private function authorizeAccess(Request $request): void
+    private function authorizeView(Request $request): void
     {
         $user = $request->user();
-        if (!$user->hasPermission('roles.view') && !$user->hasPermission('roles.manage') && !$user->isSuperAdmin()) {
-            abort(403, 'غير مصرح لك بالوصول لإدارة شجرة الصلاحيات والأدوار');
+        if (!$user || (!$user->hasPermission('roles.view') && !$user->hasPermission('roles.manage') && !$user->isSuperAdmin())) {
+            abort(403, 'غير مصرح لك بالاطلاع على شجرة الصلاحيات والأدوار');
+        }
+    }
+
+    private function authorizeManage(Request $request): void
+    {
+        $user = $request->user();
+        if (!$user || (!$user->hasPermission('roles.manage') && !$user->isSuperAdmin())) {
+            abort(403, 'غير مصرح لك بتعديل أو إدارة الأدوار والصلاحيات');
         }
     }
 }

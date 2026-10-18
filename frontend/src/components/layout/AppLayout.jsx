@@ -15,9 +15,9 @@ const navItems = [
   { label: 'لوحة التحكم',         icon: LayoutDashboard, to: '/',           exact: true, permission: null },
   { label: 'الوثائق',              icon: FileText,        to: '/documents',  permission: 'documents.view' },
   { label: 'التصنيفات',            icon: FolderTree,      to: '/categories', permission: 'categories.view' },
-  { label: 'الأقسام والفروع',      icon: Building2,       to: '/departments',permission: null },
+  { label: 'الأقسام والفروع',      icon: Building2,       to: '/departments',permission: 'departments.view' },
   { label: 'المستخدمون',           icon: Users,           to: '/users',      permission: 'users.view' },
-  { label: 'الأدوار والصلاحيات',   icon: ShieldCheck,     to: '/roles',      permission: null },
+  { label: 'الأدوار والصلاحيات',   icon: ShieldCheck,     to: '/roles',      permission: 'roles.view' },
   { label: 'سجل العمليات',         icon: Activity,        to: '/audit',      permission: 'audit.view' },
   { label: 'الإعدادات',            icon: Settings,        to: '/settings',   permission: 'settings.view' },
 ];
@@ -139,6 +139,9 @@ export default function AppLayout() {
   const canSeeItem = (item) => {
     if (!item.permission) return true;
     if (user?.is_super_admin) return true;
+    if (item.permission === 'roles.view') {
+      return hasPermission('roles.view') || hasPermission('roles.manage');
+    }
     return hasPermission(item.permission);
   };
 
