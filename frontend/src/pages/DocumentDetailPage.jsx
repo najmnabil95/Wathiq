@@ -233,7 +233,13 @@ export default function DocumentDetailPage() {
 
   const handleOpenPrimaryPreview = () => {
     if (document?.attachments && document.attachments.length > 0) {
-      handlePreviewAttachment(document.attachments[0]);
+      // Find first previewable attachment (preferring PDF or images), or fallback to first
+      const previewable = document.attachments.find(a => {
+        const name = (a.file_name || a.original_name || '').toLowerCase();
+        return /\.(pdf|png|jpe?g|webp|gif|svg|txt|csv|json)$/i.test(name) ||
+          (a.mime_type && (a.mime_type.includes('pdf') || a.mime_type.startsWith('image/') || a.mime_type.startsWith('text/')));
+      }) || document.attachments[0];
+      handlePreviewAttachment(previewable);
     } else {
       setActivePreviewAttachment(null);
       setPreviewBlobUrl(null);
@@ -243,6 +249,7 @@ export default function DocumentDetailPage() {
   };
 
   const handlePreviewAttachment = async (att) => {
+    if (!att) return;
     setPreviewModalOpen(true);
     setActivePreviewAttachment(att);
     setPreviewZoom(1);
@@ -279,11 +286,22 @@ export default function DocumentDetailPage() {
       setPreviewBlobUrl(url);
     } catch (err) {
       console.error('Failed to preview file:', err);
-      setPreviewError('تعذر فتح المعاينة المباشرة لهذا الملف. يمكنك تنزيل الملف والاطلاع عليه محلياً.');
+      let errMsg = 'تعذر فتح المعاينة المباشرة لهذا الملف. يمكنك تنزيل الملف والاطلاع عليه محلياً.';
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const json = JSON.parse(text);
+          if (json.message) errMsg = json.message;
+        } catch (_) {}
+      } else if (err.response?.data?.message) {
+        errMsg = err.response.data.message;
+      }
+      setPreviewError(errMsg);
     } finally {
       setPreviewLoading(false);
     }
   };
+
 
   const handleClosePreview = () => {
     setPreviewModalOpen(false);
@@ -1719,7 +1737,20 @@ export default function DocumentDetailPage() {
       )}
 
       {/* ── INTERACTIVE DOCUMENT VIEWER MODAL ───────────────────────── */}
-      {previewModalOpen && typeof window !== 'undefined' && window.document?.body && createPortal(
+      {(() => {
+        const isOfficeAttachment = activePreviewAttachment && (
+          /\.(docx?|xlsx?|pptx?|zip|rar)$/i.test(activePreviewAttachment.file_name || activePreviewAttachment.original_name || '') ||
+          (activePreviewAttachment.mime_type && (
+            activePreviewAttachment.mime_type.includes('wordprocessingml') ||
+            activePreviewAttachment.mime_type.includes('msword') ||
+            activePreviewAttachment.mime_type.includes('spreadsheetml') ||
+            activePreviewAttachment.mime_type.includes('excel') ||
+            activePreviewAttachment.mime_type.includes('presentationml')
+          ))
+        );
+
+        return previewModalOpen && typeof window !== 'undefined' && window.document?.body && createPortal(
+
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-5 bg-slate-950/90 backdrop-blur-md animate-fade-in text-right"
           style={{ direction: 'rtl' }}
@@ -1898,6 +1929,34 @@ export default function DocumentDetailPage() {
                     </button>
                   </div>
                 </div>
+              ) : isOfficeAttachment ? (
+                /* Word / Excel / Archive files */
+                <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl max-w-lg text-center shadow-2xl">
+                  <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto mb-4">
+                    <FileText className="w-8 h-8" />
+                  </div>
+                  <h4 className="text-base font-bold text-white mb-1.5">{activePreviewAttachment.original_name || activePreviewAttachment.file_name}</h4>
+                  <p className="text-xs text-slate-400 mb-6">
+                    هذا الملف من نوع المستندات المكتبية. يمكنك تحميله وتشغيله مباشرة عبر التطبيقات المكتبية المعتمدة (Microsoft Office / LibreOffice).
+                  </p>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadAttachment(activePreviewAttachment.id, activePreviewAttachment.file_name || activePreviewAttachment.original_name)}
+                      className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold inline-flex items-center gap-2 shadow-lg shadow-blue-600/25 cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      تنزيل وفتح الملف
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setActivePreviewAttachment(null); setPreviewError(null); }}
+                      className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 cursor-pointer"
+                    >
+                      عرض البطاقة الرقمية
+                    </button>
+                  </div>
+                </div>
               ) : activePreviewAttachment && previewBlobUrl ? (
                 /* PDF File */
                 (activePreviewAttachment.mime_type?.includes('pdf') || (activePreviewAttachment.file_name || activePreviewAttachment.original_name || '').toLowerCase().endsWith('.pdf')) ? (
@@ -1919,32 +1978,13 @@ export default function DocumentDetailPage() {
                       className="max-h-[75vh] max-w-full object-contain shadow-2xl rounded-xl border border-white/10"
                     />
                   </div>
-                ) : /* Text / Code / CSV */
-                (activePreviewAttachment.mime_type?.startsWith('text/') || /\.(txt|json|csv|log|xml)$/i.test(activePreviewAttachment.file_name || activePreviewAttachment.original_name || '')) ? (
+                ) : (
+                  /* Text / Code / CSV */
                   <iframe
                     src={previewBlobUrl}
                     className="w-full h-full rounded-2xl border border-slate-800 bg-slate-900 text-slate-100 p-4 font-mono text-xs shadow-2xl"
                     title="معاينة النص"
                   />
-                ) : (
-                  /* Word / Excel / Archive files */
-                  <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl max-w-lg text-center shadow-2xl">
-                    <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto mb-4">
-                      <FileText className="w-8 h-8" />
-                    </div>
-                    <h4 className="text-base font-bold text-white mb-1.5">{activePreviewAttachment.original_name || activePreviewAttachment.file_name}</h4>
-                    <p className="text-xs text-slate-400 mb-6">
-                      هذا الملف من نوع المستندات المكتبية. يمكنك تحميله وتشغيله مباشرة عبر التطبيقات المكتبية المعتمدة (Microsoft Office / LibreOffice).
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadAttachment(activePreviewAttachment.id, activePreviewAttachment.file_name || activePreviewAttachment.original_name)}
-                      className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold inline-flex items-center gap-2 shadow-lg shadow-blue-600/25 cursor-pointer"
-                    >
-                      <Download className="w-4 h-4" />
-                      تنزيل وفتح الملف
-                    </button>
-                  </div>
                 )
               ) : (
                 /* Document Digital Card View (When no attachments) */
@@ -2015,7 +2055,9 @@ export default function DocumentDetailPage() {
           </div>
         </div>,
         window.document.body
-      )}
+      );
+    })()}
+
       </div>
 
       {/* ════════════════════════════════════════════════════════════

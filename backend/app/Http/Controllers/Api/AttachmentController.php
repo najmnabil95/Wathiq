@@ -153,12 +153,15 @@ class AttachmentController extends Controller
 
         $fileContents = $disk->get($filePath);
         $mime = $attachment->mime_type ?: 'application/pdf';
+        $safeAscii = preg_replace('/[^\x20-\x7E]/', '_', $attachment->original_name ?: 'document');
+        $encodedName = rawurlencode($attachment->original_name ?: 'document');
 
         return response($fileContents, 200)
             ->header('Content-Type', $mime)
-            ->header('Content-Disposition', 'inline; filename="' . $attachment->original_name . '"')
+            ->header('Content-Disposition', "inline; filename=\"{$safeAscii}\"; filename*=UTF-8''{$encodedName}")
             ->header('Content-Length', strlen($fileContents))
             ->header('Cache-Control', 'private, no-cache');
+
     }
 
     public function destroy(Request $request, int $docId, int $attId): JsonResponse
@@ -244,8 +247,13 @@ class AttachmentController extends Controller
 
     private function checkPermission(string $perm): void
     {
-        if (!request()->user()->hasPermission($perm) && !request()->user()->isSuperAdmin()) {
-            abort(403);
+        $user = auth()->user() ?? request()->user();
+        if (!$user) {
+            abort(401, 'غير مصرح.');
+        }
+        if (!$user->hasPermission($perm) && !$user->isSuperAdmin()) {
+            abort(403, 'ليس لديك صلاحية للقيام بهذه العملية.');
         }
     }
 }
+

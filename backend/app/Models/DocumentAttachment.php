@@ -62,14 +62,42 @@ class DocumentAttachment extends Model
      */
     public function getIsPreviewableAttribute(): bool
     {
-        return in_array($this->mime_type, [
+        $previewableMimes = [
             'application/pdf',
             'image/jpeg',
             'image/png',
             'image/gif',
             'image/webp',
-        ]);
+            'image/svg+xml',
+            'image/bmp',
+            'text/plain',
+            'text/csv',
+            'text/html',
+            'application/json',
+            'text/markdown',
+            'text/xml',
+            'application/xml',
+        ];
+
+        $previewableExtensions = [
+            'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp',
+            'txt', 'csv', 'json', 'log', 'xml', 'md',
+        ];
+
+        $mime = strtolower((string)$this->mime_type);
+        $ext = strtolower((string)($this->extension ?: pathinfo($this->file_path, PATHINFO_EXTENSION)));
+
+        if (in_array($mime, $previewableMimes) || in_array($ext, $previewableExtensions)) {
+            return true;
+        }
+
+        if (str_starts_with($mime, 'image/') || str_starts_with($mime, 'text/')) {
+            return true;
+        }
+
+        return false;
     }
+
 
     // ─── Scopes ───────────────────────────────────────────────────
 

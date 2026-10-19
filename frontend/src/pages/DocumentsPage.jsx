@@ -93,7 +93,12 @@ export default function DocumentsPage() {
 
       const attachments = fullDoc?.attachments || [];
       if (attachments.length > 0) {
-        handleSelectPreviewAttachment(doc.id, attachments[0]);
+        const previewable = attachments.find(a => {
+          const name = (a.file_name || a.original_name || '').toLowerCase();
+          return /\.(pdf|png|jpe?g|webp|gif|svg|txt|csv|json)$/i.test(name) ||
+            (a.mime_type && (a.mime_type.includes('pdf') || a.mime_type.startsWith('image/') || a.mime_type.startsWith('text/')));
+        }) || attachments[0];
+        handleSelectPreviewAttachment(doc.id, previewable);
       }
     } catch (err) {
       console.error('Failed to load full document for preview:', err);
@@ -103,13 +108,21 @@ export default function DocumentsPage() {
   };
 
   const handleSelectPreviewAttachment = async (docId, att) => {
+    if (!att) return;
     setQuickPreviewAttachment(att);
     setQuickPreviewError(null);
     setPreviewZoom(1);
     setPreviewRotation(0);
 
-    const ext = (att.file_name || att.original_name || '').split('.').pop()?.toLowerCase();
-    const isOffice = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext);
+    const fileName = (att.file_name || att.original_name || '').toLowerCase();
+    const isOffice = /\.(docx?|xlsx?|pptx?|zip|rar)$/i.test(fileName) ||
+      (att.mime_type && (
+        att.mime_type.includes('wordprocessingml') ||
+        att.mime_type.includes('msword') ||
+        att.mime_type.includes('spreadsheetml') ||
+        att.mime_type.includes('excel') ||
+        att.mime_type.includes('presentationml')
+      ));
 
     if (isOffice) {
       if (quickPreviewBlobUrl) {
@@ -130,11 +143,22 @@ export default function DocumentsPage() {
       setQuickPreviewBlobUrl(url);
     } catch (err) {
       console.error('Failed to preview attachment:', err);
-      setQuickPreviewError('تعذر فتح المعاينة المباشرة لهذا الملف. يمكنك تنزيل الملف والاطلاع عليه محلياً.');
+      let errMsg = 'تعذر فتح المعاينة المباشرة لهذا الملف. يمكنك تنزيل الملف والاطلاع عليه محلياً.';
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const json = JSON.parse(text);
+          if (json.message) errMsg = json.message;
+        } catch (_) {}
+      } else if (err.response?.data?.message) {
+        errMsg = err.response.data.message;
+      }
+      setQuickPreviewError(errMsg);
     } finally {
       setPreviewBlobLoading(false);
     }
   };
+
 
   const handleCloseQuickPreview = () => {
     if (quickPreviewBlobUrl) {
@@ -1734,17 +1758,26 @@ export default function DocumentsPage() {
                         />
                       )}
                     </div>
-                  ) : quickPreviewAttachment && ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes((quickPreviewAttachment.file_name || '').split('.').pop()?.toLowerCase()) ? (
+                  ) : quickPreviewAttachment && (
+                    /\.(docx?|xlsx?|pptx?|zip|rar)$/i.test(quickPreviewAttachment.file_name || quickPreviewAttachment.original_name || '') ||
+                    (quickPreviewAttachment.mime_type && (
+                      quickPreviewAttachment.mime_type.includes('wordprocessingml') ||
+                      quickPreviewAttachment.mime_type.includes('msword') ||
+                      quickPreviewAttachment.mime_type.includes('spreadsheetml') ||
+                      quickPreviewAttachment.mime_type.includes('excel') ||
+                      quickPreviewAttachment.mime_type.includes('presentationml')
+                    ))
+                  ) ? (
                     <div className="text-center p-8 max-w-md space-y-3">
                       <FileCheck className="w-14 h-14 text-blue-400 mx-auto" />
                       <h4 className="text-sm font-bold text-white">مستند Office جاهز للاطلاع</h4>
                       <p className="text-xs text-slate-400">
-                        هذا الملف بصيغة مكتبية ({quickPreviewAttachment.file_name?.split('.').pop()?.toUpperCase()}). يمكنك تنزيله ومراجعته على جهازك.
+                        هذا الملف بصيغة مكتبية ({quickPreviewAttachment.original_name || quickPreviewAttachment.file_name}). يمكنك تنزيله ومراجعته على جهازك.
                       </p>
                       <button
                         type="button"
                         onClick={() => handleDownloadQuickAttachment(quickPreviewDoc.id, quickPreviewAttachment)}
-                        className="btn btn-primary btn-sm flex items-center gap-2 mx-auto"
+                        className="btn btn-primary btn-sm flex items-center gap-2 mx-auto cursor-pointer"
                       >
                         <Download size={14} />
                         <span>تنزيل المستند</span>
