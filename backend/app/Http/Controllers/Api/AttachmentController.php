@@ -92,9 +92,20 @@ class AttachmentController extends Controller
         $document   = Document::findOrFail($docId);
         $attachment = DocumentAttachment::where('document_id', $docId)->findOrFail($attId);
 
-        // Check file exists on disk
-        if (!Storage::disk($attachment->disk)->exists($attachment->file_path)) {
-            return response()->json(['success' => false, 'message' => 'الملف غير موجود.'], 404);
+        $diskName = $attachment->disk ?: 'local';
+        $disk = Storage::disk($diskName);
+        $filePath = $attachment->file_path;
+
+        // Resolve disk and file existence with fallback support
+        if (!$disk->exists($filePath)) {
+            $fallback = ($diskName === 'private') ? 'local' : 'private';
+            if (Storage::disk($fallback)->exists($filePath)) {
+                $disk = Storage::disk($fallback);
+            } else if (file_exists(storage_path('app/' . $filePath))) {
+                $disk = Storage::disk('local');
+            } else {
+                return response()->json(['success' => false, 'message' => 'الملف غير موجود.'], 404);
+            }
         }
 
         $this->auditService->log(
@@ -105,20 +116,18 @@ class AttachmentController extends Controller
             "File downloaded: {$attachment->original_name}"
         );
 
-        $diskName = $attachment->disk ?: 'local';
-        $disk = Storage::disk($diskName);
-        if (!$disk->exists($attachment->file_path)) {
-            $fallback = ($diskName === 'private') ? 'local' : 'private';
-            if (Storage::disk($fallback)->exists($attachment->file_path)) {
-                $disk = Storage::disk($fallback);
-            }
-        }
+        $safeAscii = preg_replace('/[^\x20-\x7E]/', '_', $attachment->original_name ?: 'download');
+        $encodedName = rawurlencode($attachment->original_name ?: 'download');
 
         return $disk->download(
-            $attachment->file_path,
-            $attachment->original_name
+            $filePath,
+            $safeAscii,
+            [
+                'Content-Disposition' => "attachment; filename=\"{$safeAscii}\"; filename*=UTF-8''{$encodedName}",
+            ]
         );
     }
+
 
     /**
      * Secure file preview — streams file inline.
