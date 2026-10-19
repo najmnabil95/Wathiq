@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { documentsAPI, categoriesAPI, documentTypesAPI, settingsAPI, organizationsAPI, departmentsAPI, attachmentsAPI } from '../services/api';
 import { useAuthStore } from '../store/authStore';
-import { ArrowRight, Save, Plus, X, Upload, FileText, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowRight, Save, Plus, X, Upload, FileText, AlertCircle, Loader2, Camera } from 'lucide-react';
 import toast from 'react-hot-toast';
+import DocumentScannerModal from '../components/common/DocumentScannerModal';
 
 // ── Dynamic Field Renderer ─────────────────────────────────────
 function DynamicField({ field, value, onChange }) {
@@ -93,6 +94,7 @@ function DynamicField({ field, value, onChange }) {
 
 export default function CreateDocumentPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuthStore();
 
   const [categories, setCategories]       = useState([]);
@@ -102,6 +104,7 @@ export default function CreateDocumentPage() {
   const [users, setUsers]                 = useState([]);
   const [confLevels, setConfLevels]       = useState([]);
   const [dynamicFields, setDynamicFields] = useState([]);
+  const [scannerOpen, setScannerOpen]     = useState(false);
 
   const [form, setForm] = useState({
     title:                    '',
@@ -123,6 +126,14 @@ export default function CreateDocumentPage() {
   const [files, setFiles] = useState([]);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+
+  // Read scanned file if passed from global camera
+  useEffect(() => {
+    if (location.state?.scannedFile) {
+      setFiles(prev => [...prev, location.state.scannedFile]);
+      toast.success('تم إدراج المستند الممسوح ضوئياً في المرفقات.');
+    }
+  }, [location.state]);
 
   // Load reference data
   useEffect(() => {
@@ -354,7 +365,18 @@ export default function CreateDocumentPage() {
 
           {/* ── Attachments ── */}
           <div className="glass p-6 space-y-4">
-            <h2 className="font-bold text-sm uppercase tracking-wide" style={{ color: '#526080' }}>المرفقات</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-sm uppercase tracking-wide" style={{ color: '#526080' }}>المرفقات</h2>
+              <button
+                type="button"
+                onClick={() => setScannerOpen(true)}
+                className="btn btn-secondary text-xs gap-1.5 text-emerald-400 hover:text-emerald-300 py-1.5"
+                title="التقاط المستند مباشرة عبر كاميرا الجهاز"
+              >
+                <Camera size={14} />
+                مسح ضوئي بالكاميرا
+              </button>
+            </div>
             <label
               htmlFor="file-upload"
               className="flex flex-col items-center justify-center gap-3 p-8 rounded-xl cursor-pointer transition-all"
@@ -522,6 +544,16 @@ export default function CreateDocumentPage() {
           </button>
         </div>
       </div>
+
+      {/* Document Scanner Modal */}
+      <DocumentScannerModal
+        isOpen={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onCapture={(file) => {
+          setFiles(prev => [...prev, file]);
+          toast.success('تم مسح وإدراج المستند في المرفقات بنجاح.');
+        }}
+      />
     </form>
   );
 }

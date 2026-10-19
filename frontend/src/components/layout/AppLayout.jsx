@@ -6,9 +6,10 @@ import {
   LayoutDashboard, FolderOpen, FolderTree, Users, ShieldCheck,
   Settings, LogOut, Menu, X, Bell, Search, ChevronDown,
   ChevronRight, ChevronLeft, Archive, FileText, Activity, Shield, Building2,
-  User
+  User, Sun, Moon, Camera, Plus, ScanLine
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import DocumentScannerModal from '../common/DocumentScannerModal';
 
 // ── Navigation Items ──────────────────────────────────────────
 const navItems = [
@@ -62,6 +63,22 @@ export default function AppLayout() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [device, setDevice] = useState('desktop');
   const [pendingCount, setPendingCount] = useState(0);
+  const [theme, setTheme] = useState(() => localStorage.getItem('edms_theme') || 'dark');
+  const [globalScannerOpen, setGlobalScannerOpen] = useState(false);
+
+  // Sync theme with DOM and localStorage
+  useEffect(() => {
+    if (theme === 'light') {
+      document.documentElement.classList.add('light-theme');
+    } else {
+      document.documentElement.classList.remove('light-theme');
+    }
+    localStorage.setItem('edms_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   const isMobile = device === 'mobile';
 
@@ -365,6 +382,24 @@ export default function AppLayout() {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            {/* Camera Scanner Button */}
+            <button
+              className="btn btn-secondary btn-icon text-emerald-400 hover:text-emerald-300"
+              onClick={() => setGlobalScannerOpen(true)}
+              title="الماسح الضوئي الذكي للمستندات"
+            >
+              <Camera size={16} />
+            </button>
+
+            {/* Theme Toggle (Dark / Light) */}
+            <button
+              className="btn btn-secondary btn-icon text-amber-400 hover:text-amber-300"
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'التحويل إلى الوضع النهاري (Light Mode)' : 'التحويل إلى الوضع الليلي (Dark Mode)'}
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+
             {/* Quick Search */}
             <button
               className="btn btn-secondary btn-icon"
@@ -528,9 +563,51 @@ export default function AppLayout() {
         </header>
 
         {/* ── Page Content ── */}
-        <main className="flex-1 p-3 sm:p-5 md:p-6 lg:p-7 overflow-auto">
+        <main className={`flex-1 p-3 sm:p-5 md:p-6 lg:p-7 overflow-auto ${isMobile ? 'pb-20' : ''}`}>
           <Outlet />
         </main>
+
+        {/* ── Mobile Bottom Navigation Bar ── */}
+        {isMobile && (
+          <nav
+            className="fixed bottom-0 left-0 right-0 z-40 bg-surface-900/95 backdrop-blur-xl border-t border-white/10 px-4 py-2 flex items-center justify-around no-print"
+            style={{ boxShadow: '0 -4px 20px rgba(0,0,0,0.3)' }}
+          >
+            <NavLink to="/" end className={({ isActive }) => `flex flex-col items-center gap-1 text-[11px] ${isActive ? 'text-blue-400 font-bold' : 'text-slate-400'}`}>
+              <LayoutDashboard size={18} />
+              <span>الرئيسية</span>
+            </NavLink>
+            <NavLink to="/documents" className={({ isActive }) => `flex flex-col items-center gap-1 text-[11px] ${isActive ? 'text-blue-400 font-bold' : 'text-slate-400'}`}>
+              <FileText size={18} />
+              <span>الوثائق</span>
+            </NavLink>
+            <button
+              type="button"
+              onClick={() => setGlobalScannerOpen(true)}
+              className="w-12 h-12 -mt-5 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 border-2 border-white/20 text-white flex items-center justify-center shadow-lg shadow-blue-500/40 active:scale-95 transition-transform"
+              title="مسح ضوئي بالكاميرا"
+            >
+              <Camera size={20} />
+            </button>
+            <NavLink to="/documents/create" className={({ isActive }) => `flex flex-col items-center gap-1 text-[11px] ${isActive ? 'text-blue-400 font-bold' : 'text-slate-400'}`}>
+              <Plus size={18} />
+              <span>إنشاء</span>
+            </NavLink>
+            <NavLink to="/profile" className={({ isActive }) => `flex flex-col items-center gap-1 text-[11px] ${isActive ? 'text-blue-400 font-bold' : 'text-slate-400'}`}>
+              <User size={18} />
+              <span>حسابي</span>
+            </NavLink>
+          </nav>
+        )}
+
+        {/* ── Global Document Scanner Modal ── */}
+        <DocumentScannerModal
+          isOpen={globalScannerOpen}
+          onClose={() => setGlobalScannerOpen(false)}
+          onCapture={(file, data) => {
+            navigate('/documents/create', { state: { scannedFile: file, scannedPreview: data.previewUrl } });
+          }}
+        />
       </div>
     </div>
   );

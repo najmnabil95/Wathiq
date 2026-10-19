@@ -9,10 +9,12 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, Printer, FileSpreadsheet,
   Building2, ChevronDown, Layers,
   Shield, QrCode, ExternalLink, FileCheck, AlertCircle, ZoomIn, ZoomOut, RotateCw,
-  Sparkles
+  Sparkles, Camera, ShieldCheck
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
+import DocumentScannerModal from '../components/common/DocumentScannerModal';
+import WatermarkOverlay from '../components/common/WatermarkOverlay';
 
 const STATUS_CONFIG = {
   new:              { label: 'جديد',              class: 'badge-blue'    },
@@ -67,6 +69,8 @@ export default function DocumentsPage() {
   const [quickPreviewError, setQuickPreviewError] = useState(null);
   const [previewZoom, setPreviewZoom] = useState(1);
   const [previewRotation, setPreviewRotation] = useState(0);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [watermarkActive, setWatermarkActive] = useState(true);
 
   const handleOpenQuickPreview = async (doc, e) => {
     if (e) e.stopPropagation();
@@ -588,6 +592,16 @@ export default function DocumentsPage() {
               </div>
             )}
           </div>
+
+          <button
+            type="button"
+            className="btn btn-secondary text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5"
+            onClick={() => setScannerOpen(true)}
+            title="مسح ضوئي فوري بالكاميرا لمستند ورقي جديد"
+          >
+            <Camera size={15} />
+            <span>مسح ضوئي</span>
+          </button>
 
           {(user?.is_super_admin || hasPermission('documents.create')) && (
             <button id="create-document-btn" className="btn btn-primary" onClick={() => navigate('/documents/create')}>
@@ -1648,6 +1662,17 @@ export default function DocumentsPage() {
                         </button>
                         <button
                           type="button"
+                          onClick={() => setWatermarkActive(v => !v)}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs transition ${
+                            watermarkActive ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold' : 'bg-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                          title="تفعيل / إخفاء العلامة المائية الأمنية لمنع التسريب"
+                        >
+                          <ShieldCheck size={13} />
+                          <span>علامة مائية</span>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleDownloadQuickAttachment(quickPreviewDoc.id, quickPreviewAttachment)}
                           className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition"
                           title="تنزيل المرفق"
@@ -1662,6 +1687,12 @@ export default function DocumentsPage() {
 
                 {/* Viewport Content */}
                 <div className="flex-1 min-h-0 relative flex items-center justify-center rounded-xl bg-slate-900/50 border border-white/5 overflow-hidden">
+                  <WatermarkOverlay
+                    userName={user?.name}
+                    documentNumber={quickPreviewDoc?.document_number}
+                    confidentialityLevel={quickPreviewDoc?.confidentiality_level?.label_ar || 'سري'}
+                    isActive={watermarkActive}
+                  />
                   {quickPreviewLoading || previewBlobLoading ? (
                     <div className="flex flex-col items-center justify-center p-8 text-slate-400 gap-3">
                       <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -1944,6 +1975,14 @@ export default function DocumentsPage() {
           }
         }
       `}</style>
+      {/* ── Document Camera Scanner Modal ── */}
+      <DocumentScannerModal
+        isOpen={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onCapture={(file, data) => {
+          navigate('/documents/create', { state: { scannedFile: file, scannedPreview: data?.previewUrl } });
+        }}
+      />
     </div>
   );
 }

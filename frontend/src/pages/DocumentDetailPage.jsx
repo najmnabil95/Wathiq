@@ -14,9 +14,12 @@ import {
   Tag, Building2, Calendar, User, MapPin, Hash, QrCode,
   Printer, AlertCircle, FileCheck, Layers, ExternalLink, Edit3,
   ZoomIn, ZoomOut, RotateCw, X, MessageSquare, GitBranch, Share2, Copy, Send, Check,
-  Sparkles, RefreshCw, Search
+  Sparkles, RefreshCw, Search, Stamp, Camera, ShieldCheck, Waves
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import DocumentScannerModal from '../components/common/DocumentScannerModal';
+import DigitalSignatureModal from '../components/common/DigitalSignatureModal';
+import WatermarkOverlay from '../components/common/WatermarkOverlay';
 
 // Vector SVG Barcode component for razor-sharp label & laser printing
 function BarcodeVector({ value, height = 44, width = 240, showText = true }) {
@@ -77,6 +80,52 @@ export default function DocumentDetailPage() {
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadDescription, setUploadDescription] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+
+  // Advanced Scanner, Digital Signature & Watermark states
+  const [scannerModalOpen, setScannerModalOpen] = useState(false);
+  const [digitalSignatureModalOpen, setDigitalSignatureModalOpen] = useState(false);
+  const [watermarkActive, setWatermarkActive] = useState(true);
+
+  const handleScanAndUploadAttachment = async (file, scanData) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('description', 'مستند ممسوح ضوئياً عبر الماسح الذكي للكاميرا');
+
+    try {
+      setIsUploading(true);
+      const res = await attachmentsAPI.upload(id, formData);
+      toast.success('تم مسح وإيداع المستند كمرفق رسمي بنجاح');
+      
+      const newAttId = res.data?.data?.id;
+      if (newAttId && scanData?.ocrText) {
+        await attachmentsAPI.processOcr(id, newAttId, { ocr_text: scanData.ocrText });
+      } else if (newAttId) {
+        attachmentsAPI.processOcr(id, newAttId).catch(() => {});
+      }
+      fetchDocument();
+    } catch (err) {
+      toast.error('فشل إيداع المستند الممسوح');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDigitalSignatureConfirm = async (sigData) => {
+    try {
+      setIsProcessing(true);
+      const commentText = `اعتماد إلكتروني رقمي موثق [رمز التحقق: ${sigData.verificationCode} | المعتمد: ${sigData.signerName} - ${sigData.jobTitle}]`;
+      await documentsAPI.approve(id, {
+        comment: commentText,
+        signature: sigData.signatureDataUrl,
+      });
+      toast.success('تم اعتماد وتوثيق الوثيقة بالختم الرقمي والتوقيع الإلكتروني بنجاح!');
+      fetchDocument();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'فشل الاعتماد بالتوقيع الرقمي');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   // OCR modal state
   const [ocrModal, setOcrModal] = useState({
@@ -536,13 +585,23 @@ export default function DocumentDetailPage() {
             {statusName === 'pending_approval' && (
               <>
                 {(user?.is_super_admin || hasPermission('documents.approve')) && (
-                  <button
-                    onClick={() => setApprovalModal({ open: true, type: 'approve' })}
-                    className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-emerald-600/20 transition cursor-pointer"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    اعتماد
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setApprovalModal({ open: true, type: 'approve' })}
+                      className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-emerald-600/20 transition cursor-pointer"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      اعتماد
+                    </button>
+                    <button
+                      onClick={() => setDigitalSignatureModalOpen(true)}
+                      className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-blue-600/20 transition cursor-pointer"
+                      title="اعتماد وتوثيق الوثيقة بختم أو توقيع إلكتروني رسمي"
+                    >
+                      <Stamp className="w-4 h-4" />
+                      اعتماد بختم / توقيع رقمي
+                    </button>
+                  </>
                 )}
                 {(user?.is_super_admin || hasPermission('documents.reject')) && (
                   <button
@@ -968,10 +1027,21 @@ export default function DocumentDetailPage() {
           {/* Upload Form */}
           {(user?.is_super_admin || hasPermission('attachments.upload')) && (
             <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-6 backdrop-blur-md">
-              <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                <Upload className="w-5 h-5 text-blue-400" />
-                إرفاق ملف جديد للوثيقة
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Upload className="w-5 h-5 text-blue-400" />
+                  إرفاق ملف جديد للوثيقة
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setScannerModalOpen(true)}
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/30 text-xs font-bold transition shadow-sm cursor-pointer"
+                  title="التقاط المستند مباشرة عبر كاميرا الهاتف أو الجهاز"
+                >
+                  <Camera className="w-4 h-4" />
+                  مسح ضوئي بالكاميرا
+                </button>
+              </div>
               <form onSubmit={handleUploadAttachment} className="flex flex-col sm:flex-row gap-4 items-end">
                 <div className="flex-1 w-full">
                   <label className="block text-xs font-semibold text-slate-400 mb-2">اختر الملف (PDF, DOCX, XLSX, PNG, JPG)</label>
@@ -1735,6 +1805,21 @@ export default function DocumentDetailPage() {
                   </div>
                 )}
 
+                {/* Watermark Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setWatermarkActive(v => !v)}
+                  className={`p-2 rounded-xl transition flex items-center gap-1.5 text-xs font-semibold ${
+                    watermarkActive
+                      ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-sm'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700'
+                  }`}
+                  title="تفعيل / إخفاء العلامة المائية الأمنية لمنع التسريب"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span className="hidden sm:inline">علامة مائية أمنية</span>
+                </button>
+
                 {/* Direct Download of active attachment */}
                 {activePreviewAttachment && (
                   <button
@@ -1773,6 +1858,13 @@ export default function DocumentDetailPage() {
 
             {/* Viewer Stage / Canvas */}
             <div className="flex-1 overflow-hidden relative flex items-center justify-center bg-[#060a14] p-3 sm:p-5">
+              {/* Security Watermark Overlay */}
+              <WatermarkOverlay
+                userName={user?.name}
+                documentNumber={document?.document_number}
+                confidentialityLevel={confLabel}
+                isActive={watermarkActive}
+              />
               {previewLoading ? (
                 <div className="flex flex-col items-center justify-center p-12 text-slate-400">
                   <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
@@ -2223,6 +2315,22 @@ export default function DocumentDetailPage() {
         </div>,
         window.document.body
       )}
+      {/* ── Document Camera Scanner Modal ── */}
+      <DocumentScannerModal
+        isOpen={scannerModalOpen}
+        onClose={() => setScannerModalOpen(false)}
+        documentTitle={document?.title}
+        onCapture={(file, data) => handleScanAndUploadAttachment(file, data)}
+      />
+
+      {/* ── Digital Signature & Official Stamp Modal ── */}
+      <DigitalSignatureModal
+        isOpen={digitalSignatureModalOpen}
+        onClose={() => setDigitalSignatureModalOpen(false)}
+        defaultSignerName={user?.name}
+        documentNumber={document?.document_number}
+        onConfirm={handleDigitalSignatureConfirm}
+      />
     </div>
   );
 }

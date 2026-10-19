@@ -7,22 +7,19 @@ use App\Models\DocumentAttachment;
 use App\Models\User;
 use Tests\TestCase;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
 class DocumentSearchOcrTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        config([
-            'database.default' => 'mysql',
-            'database.connections.mysql.database' => 'it_edms_db',
-        ]);
-    }
+    use RefreshDatabase;
 
     /**
      * Test full-text search matching OCR attachment text.
      */
     public function test_document_search_finds_ocr_content(): void
     {
+        $this->seed();
+
         $admin = User::whereHas('roles', fn($q) => $q->where('name', 'super_admin'))->first() ?? User::first();
         $this->assertNotNull($admin, 'A user must exist in the database to run API tests.');
 
