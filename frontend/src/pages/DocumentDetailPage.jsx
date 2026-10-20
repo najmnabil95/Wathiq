@@ -4,9 +4,11 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   documentsAPI,
   attachmentsAPI,
+  versionsAPI,
   auditAPI,
   settingsAPI
 } from '../services/api';
+
 import { useAuthStore } from '../store/authStore';
 import {
   FileText, ArrowRight, Download, Eye, Upload, Trash2,
@@ -196,6 +198,14 @@ export default function DocumentDetailPage() {
   const [previewError, setPreviewError] = useState(null);
   const [previewZoom, setPreviewZoom] = useState(1);
   const [previewRotation, setPreviewRotation] = useState(0);
+
+  // Version Modal State
+  const [versionModalOpen, setVersionModalOpen] = useState(false);
+  const [versionNumber, setVersionNumber] = useState('');
+  const [versionSummary, setVersionSummary] = useState('');
+  const [versionFile, setVersionFile] = useState(null);
+  const [versionSubmitting, setVersionSubmitting] = useState(false);
+
 
   useEffect(() => {
     fetchDocument();
@@ -495,6 +505,66 @@ export default function DocumentDetailPage() {
       await new Promise(r => setTimeout(r, 350));
     }
   };
+
+  const handleOpenNewVersionModal = () => {
+    const nextVer = `v1.${((document?.versions?.length || 0) + 1)}`;
+    setVersionNumber(nextVer);
+    setVersionSummary('');
+    setVersionFile(null);
+    setVersionModalOpen(true);
+  };
+
+  const handleCreateVersion = async (e) => {
+    e.preventDefault();
+    if (!versionNumber.trim()) {
+      toast.error('يرجى تحديد رقم الإصدار');
+      return;
+    }
+    if (!versionSummary.trim()) {
+      toast.error('يرجى كتابة ملخص التعديلات والتغييرات');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('version_number', versionNumber.trim());
+    formData.append('change_summary', versionSummary.trim());
+    if (versionFile) {
+      formData.append('file', versionFile);
+    }
+
+    setVersionSubmitting(true);
+    try {
+      const res = await versionsAPI.create(id, formData);
+      toast.success(res.data?.message || 'تم تسجيل الإصدار الجديد بنجاح');
+      setVersionModalOpen(false);
+      fetchDocument();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'فشل تسجيل الإصدار الجديد');
+    } finally {
+      setVersionSubmitting(false);
+    }
+  };
+
+  const handleDownloadVersion = async (ver) => {
+    if (!ver.file_path) {
+      toast.error('هذا الإصدار لا يحتوي على ملف مرفق (تعديل بيانات فقط)');
+      return;
+    }
+    try {
+      const res = await versionsAPI.download(id, ver.id);
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = window.document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${document.document_number}_${ver.version_number}_${ver.file_name || 'document.pdf'}`);
+      window.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error('فشل تحميل ملف الإصدار');
+    }
+  };
+
 
   if (loading) {
     return (
@@ -1256,8 +1326,135 @@ export default function DocumentDetailPage() {
         </div>
       )}
 
+      {/* ── TAB: VERSIONS MANAGEMENT & RELEASE TIMELINE ───────────── */}
+      {activeTab === 'versions' && (
+        <div className="space-y-6">
+          <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-5 sm:p-6 backdrop-blur-md">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-800">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <GitBranch className="w-5 h-5 text-cyan-400" />
+                  سجل الإصدارات والتعديلات التوثيقية (Document Versioning)
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  تتبع دورة تحديث الوثيقة، الفروقات، مراجعة النسخ السابقة، وتحميل المستندات المؤرشفة تاريخياً.
+                </p>
+              </div>
+
+              {(user?.is_super_admin || hasPermission('documents.update')) && (
+                <button
+                  type="button"
+                  onClick={handleOpenNewVersionModal}
+                  className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold flex items-center gap-2 transition shadow-lg shadow-cyan-600/20 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  تسجيل إصدار جديد (New Release)
+                </button>
+              )}
+            </div>
+
+            {/* Versions Timeline List */}
+            {document.versions && document.versions.length > 0 ? (
+              <div className="relative pr-6 border-r-2 border-slate-800 space-y-6 mr-3">
+                {document.versions.map((ver, idx) => {
+                  const isLatest = idx === 0;
+                  return (
+                    <div key={ver.id} className="relative">
+                      {/* Timeline Dot */}
+                      <span
+                        className={`absolute -right-[31px] top-1.5 w-4 h-4 rounded-full ring-4 ring-slate-900 ${
+                          isLatest ? 'bg-cyan-400 shadow-md shadow-cyan-400/50' : 'bg-slate-600'
+                        }`}
+                      />
+
+                      <div className={`rounded-2xl border p-5 transition-all ${
+                        isLatest
+                          ? 'bg-slate-950/70 border-cyan-500/30 shadow-lg shadow-cyan-500/5'
+                          : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700'
+                      }`}>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                              {ver.version_number}
+                            </span>
+                            {isLatest && (
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                                الإصدار الأحدث المعمول به
+                              </span>
+                            )}
+                            <span className="text-sm font-bold text-white">
+                              {ver.file_name ? ver.file_name : 'تحديث بيانات إدارية'}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-3 text-xs text-slate-400 font-mono">
+                            <span style={{ direction: 'ltr' }}>
+                              {ver.created_at ? new Date(ver.created_at).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Change Notes */}
+                        <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/5 text-xs text-slate-300 leading-relaxed mb-4">
+                          <span className="text-slate-400 block mb-1 font-semibold text-[11px]">بيان التغييرات (Release Notes):</span>
+                          {ver.change_summary}
+                        </div>
+
+                        {/* Meta and Download Action */}
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-3 border-t border-white/5 text-xs text-slate-400">
+                          <div className="flex items-center gap-4 flex-wrap text-[11px]">
+                            <span>المُوثِّق: <strong className="text-slate-200">{ver.uploader?.name || 'النظام'}</strong></span>
+                            {ver.file_size && (
+                              <span>الحجم: <strong className="font-mono text-slate-300">{(ver.file_size / 1024).toFixed(1)} KB</strong></span>
+                            )}
+                            {ver.checksum && (
+                              <span className="hidden md:inline font-mono text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-400 border border-white/5" title={`SHA-256: ${ver.checksum}`}>
+                                HASH: {ver.checksum.slice(0, 12)}...
+                              </span>
+                            )}
+                          </div>
+
+                          {ver.file_path && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadVersion(ver)}
+                              className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              تحميل هذا الإصدار
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-slate-400 space-y-3">
+                <GitBranch className="w-12 h-12 text-slate-600 mx-auto" />
+                <h4 className="text-sm font-bold text-slate-300">لا توجد إصدارات مسجلة بعد</h4>
+                <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                  هذه الوثيقة ما زالت تعمل بإصدارها الأصلي المعتمد الأول. يمكنك إنشاء إصدار جديد لتوثيق أي تحديثات أو مراجعات لاحقة.
+                </p>
+                {(user?.is_super_admin || hasPermission('documents.update')) && (
+                  <button
+                    type="button"
+                    onClick={handleOpenNewVersionModal}
+                    className="btn btn-secondary btn-sm mt-2"
+                  >
+                    + إنشاء أول إصدار مرقم
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── TAB: COMMENTS & ADMINISTRATIVE NOTES ──────────────────── */}
       {activeTab === 'comments' && (
+
         <div className="space-y-6">
           {/* Add Comment Box */}
           {(user?.is_super_admin || hasPermission('comments.create')) && (
@@ -1736,7 +1933,124 @@ export default function DocumentDetailPage() {
         window.document.body
       )}
 
+      {/* ── CREATE NEW VERSION MODAL ─────────────────────────────────── */}
+      {versionModalOpen && typeof window !== 'undefined' && window.document?.body && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md"
+          style={{ direction: 'rtl' }}
+          onClick={() => setVersionModalOpen(false)}
+        >
+          <div
+            className="bg-[#0c1427] border border-cyan-500/30 rounded-3xl w-full max-w-lg shadow-2xl shadow-cyan-500/10 flex flex-col overflow-hidden text-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-[#080d19]">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                  <GitBranch className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">تسجيل إصدار جديد للوثيقة</h3>
+                  <p className="text-[11px] text-slate-400 font-mono">{document.document_number}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVersionModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateVersion} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  رقم الإصدار الجديد *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={versionNumber}
+                  onChange={(e) => setVersionNumber(e.target.value)}
+                  placeholder="مثال: v1.1 أو v2.0"
+                  className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">يُوصى باستخدام صيغ الإصدارات المعيارية مثل v1.1 أو v2.0</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  بيان وملخص التغييرات والتحديثات *
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={versionSummary}
+                  onChange={(e) => setVersionSummary(e.target.value)}
+                  placeholder="اكتب تفاصيل التحديث، سبب الإصدار، وأبرز ما تم تعديله..."
+                  className="w-full bg-[#070d1a] border border-slate-800 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 leading-relaxed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  ملف الوثيقة المحدث (اختياري / يُستحسن إرفاقه)
+                </label>
+                <div className="border border-dashed border-slate-700 hover:border-cyan-500/50 rounded-xl p-4 text-center bg-slate-900/40 transition">
+                  <input
+                    type="file"
+                    id="version-file-input"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) setVersionFile(e.target.files[0]);
+                    }}
+                  />
+                  {versionFile ? (
+                    <div className="flex items-center justify-between gap-2 p-2 bg-slate-800/80 rounded-lg text-xs">
+                      <span className="text-white truncate font-medium">{versionFile.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setVersionFile(null)}
+                        className="text-rose-400 hover:text-rose-300 text-xs shrink-0"
+                      >
+                        إزالة
+                      </button>
+                    </div>
+                  ) : (
+                    <label htmlFor="version-file-input" className="cursor-pointer block space-y-1">
+                      <Upload className="w-6 h-6 text-cyan-400 mx-auto" />
+                      <p className="text-xs text-slate-300 font-medium">اضغط لاختيار الملف الجديد لهذا الإصدار</p>
+                      <p className="text-[10px] text-slate-500">يدعم PDF, Word, Excel, Images حتى 20MB</p>
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setVersionModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={versionSubmitting}
+                  className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-lg shadow-cyan-600/20 disabled:opacity-50 cursor-pointer"
+                >
+                  {versionSubmitting ? 'جاري التوثيق...' : 'اعتماد وتسجيل الإصدار'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        window.document.body
+      )}
+
       {/* ── INTERACTIVE DOCUMENT VIEWER MODAL ───────────────────────── */}
+
       {(() => {
         const isOfficeAttachment = activePreviewAttachment && (
           /\.(docx?|xlsx?|pptx?|zip|rar)$/i.test(activePreviewAttachment.file_name || activePreviewAttachment.original_name || '') ||

@@ -4,7 +4,10 @@ use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DocumentController;
+use App\Http\Controllers\Api\DocumentVersionController;
 use App\Http\Controllers\Api\AttachmentController;
+
+
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\DepartmentController;
@@ -52,16 +55,21 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
     Route::get('/dashboard/activity',        [DashboardController::class, 'activity']);
 
     // Documents
-    Route::get   ('/documents',              [DocumentController::class, 'index']);
-    Route::post  ('/documents',              [DocumentController::class, 'store']);
-    Route::get   ('/documents/{id}',         [DocumentController::class, 'show']);
-    Route::put   ('/documents/{id}',         [DocumentController::class, 'update']);
-    Route::delete('/documents/{id}',         [DocumentController::class, 'destroy']);
-    Route::post  ('/documents/{id}/archive', [DocumentController::class, 'archive']);
-    Route::post  ('/documents/{id}/restore', [DocumentController::class, 'restore']);
-    Route::post  ('/documents/{id}/approve', [DocumentController::class, 'approve']);
-    Route::post  ('/documents/{id}/reject',  [DocumentController::class, 'reject']);
-    Route::post  ('/documents/{id}/comments',[DocumentController::class, 'addComment']);
+    Route::post  ('/documents/batch',            [DocumentController::class, 'batch']);
+    Route::get   ('/documents',                  [DocumentController::class, 'index']);
+    Route::post  ('/documents',                  [DocumentController::class, 'store']);
+    Route::get   ('/documents/{id}',             [DocumentController::class, 'show']);
+    Route::put   ('/documents/{id}',             [DocumentController::class, 'update']);
+    Route::delete('/documents/{id}',             [DocumentController::class, 'destroy']);
+    Route::post  ('/documents/{id}/archive',     [DocumentController::class, 'archive']);
+    Route::post  ('/documents/{id}/restore',     [DocumentController::class, 'restore']);
+    Route::post  ('/documents/{id}/approve',     [DocumentController::class, 'approve']);
+    Route::post  ('/documents/{id}/reject',      [DocumentController::class, 'reject']);
+    Route::post  ('/documents/{id}/comments',    [DocumentController::class, 'addComment']);
+    Route::get   ('/documents/{id}/versions',    [DocumentVersionController::class, 'index']);
+    Route::post  ('/documents/{id}/versions',    [DocumentVersionController::class, 'store']);
+    Route::get   ('/documents/{id}/versions/{versionId}/download', [DocumentVersionController::class, 'download']);
+
 
     // Attachments & OCR
     Route::post  ('/documents/{id}/attachments',               [AttachmentController::class, 'store']);

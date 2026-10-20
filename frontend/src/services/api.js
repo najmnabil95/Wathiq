@@ -80,12 +80,22 @@ export const documentsAPI = {
   archive: (id)     => api.post(`/documents/${id}/archive`),
   restore: (id)     => api.post(`/documents/${id}/restore`),
   approve: (id, data) => api.post(`/documents/${id}/approve`, data),
-  reject:  (id, data) => api.post(`/documents/${id}/reject`, data),
+  reject:     (id, data) => api.post(`/documents/${id}/reject`, data),
   addComment: (id, data) => api.post(`/documents/${id}/comments`, data),
-  search:  (params) => api.get('/search', { params }),
+  batch:      (data)     => api.post('/documents/batch', data),
+  search:     (params)   => api.get('/search', { params }),
+};
+
+
+// ─── Document Versions ─────────────────────────────────────────
+export const versionsAPI = {
+  list:     (docId)                  => api.get(`/documents/${docId}/versions`),
+  create:   (docId, formData)        => api.post(`/documents/${docId}/versions`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  download: (docId, versionId)       => api.get(`/documents/${docId}/versions/${versionId}/download`, { responseType: 'blob' }),
 };
 
 // ─── Attachments ───────────────────────────────────────────────
+
 export const attachmentsAPI = {
   list:     (docId)         => api.get(`/documents/${docId}/attachments`),
   upload:   (docId, formData) => api.post(`/documents/${docId}/attachments`, formData, {

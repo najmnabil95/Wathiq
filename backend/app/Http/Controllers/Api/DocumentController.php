@@ -408,7 +408,114 @@ class DocumentController extends Controller
         ]);
     }
 
+    // ─── Batch Operations ─────────────────────────────────────────
+
+    public function batch(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids'       => ['required', 'array', 'min:1'],
+            'ids.*'     => ['integer'],
+            'action'    => ['required', 'string', 'in:approve,reject,archive,restore,delete,change_status'],
+            'status_id' => ['nullable', 'exists:statuses,id'],
+            'comment'   => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $action = $validated['action'];
+        $ids    = $validated['ids'];
+        $count  = 0;
+
+        switch ($action) {
+            case 'approve':
+                $this->checkPermission('documents.approve');
+                $approvedStatus = Status::where('name', 'approved')->first();
+                $docs = Document::whereIn('id', $ids)->get();
+                foreach ($docs as $doc) {
+                    $approval = $doc->pendingApprovals()->first();
+                    if ($approval) {
+                        $approval->update([
+                            'status'      => 'approved',
+                            'comments'    => $request->input('comment', 'اعتماد جماعي آلي'),
+                            'approved_at' => now(),
+                        ]);
+                    }
+                    if ($approvedStatus) {
+                        $doc->update(['status_id' => $approvedStatus->id]);
+                    }
+                    $this->auditService->log('approve', $doc, null, null, "Batch approved: {$doc->document_number}");
+                    $count++;
+                }
+                break;
+
+            case 'archive':
+                $this->checkPermission('documents.archive');
+                $archivedStatus = Status::where('name', 'archived')->first();
+                $docs = Document::whereIn('id', $ids)->where('is_archived', false)->get();
+                foreach ($docs as $doc) {
+                    $doc->update([
+                        'is_archived' => true,
+                        'archived_at' => now(),
+                        'status_id'   => $archivedStatus ? $archivedStatus->id : $doc->status_id,
+                    ]);
+                    $this->auditService->log('archive', $doc, null, null, "Batch archived: {$doc->document_number}");
+                    $count++;
+                }
+                break;
+
+            case 'restore':
+                $this->checkPermission('documents.restore');
+                $docs = Document::withTrashed()->whereIn('id', $ids)->get();
+                foreach ($docs as $doc) {
+                    if ($doc->trashed()) {
+                        $doc->restore();
+                    }
+                    $doc->update(['is_archived' => false, 'archived_at' => null]);
+                    $this->auditService->log('restore', $doc, null, null, "Batch restored: {$doc->document_number}");
+                    $count++;
+                }
+                break;
+
+            case 'delete':
+                $this->checkPermission('documents.delete');
+                $docs = Document::whereIn('id', $ids)->get();
+                foreach ($docs as $doc) {
+                    $this->auditService->log('delete', $doc, ['title' => $doc->title], null, "Batch deleted: {$doc->document_number}");
+                    $doc->delete();
+                    $count++;
+                }
+                break;
+
+            case 'change_status':
+                $this->checkPermission('documents.update');
+                if (!$request->filled('status_id')) {
+                    return response()->json(['success' => false, 'message' => 'الحالة الجديدة مطلوبة.'], 422);
+                }
+                $docs = Document::whereIn('id', $ids)->get();
+                foreach ($docs as $doc) {
+                    $oldStatus = $doc->status_id;
+                    $doc->update(['status_id' => $validated['status_id']]);
+                    $this->auditService->log('update_status', $doc, ['old_status_id' => $oldStatus], ['new_status_id' => $validated['status_id']], "Batch status changed: {$doc->document_number}");
+                    $count++;
+                }
+                break;
+        }
+
+        $actionArabic = [
+            'approve'       => 'اعتماد',
+            'archive'       => 'أرشفة',
+            'restore'       => 'استعادة',
+            'delete'        => 'حذف',
+            'change_status' => 'تحديث حالة',
+        ][$action] ?? 'معالجة';
+
+        return response()->json([
+            'success'         => true,
+            'message'         => "تم بنجاح {$actionArabic} {$count} وثيقة.",
+            'processed_count' => $count,
+        ]);
+    }
+
     // ─── Helpers ─────────────────────────────────────────────────
+
 
     private function saveFieldValues(int $documentId, int $documentTypeId, array $fields): void
     {

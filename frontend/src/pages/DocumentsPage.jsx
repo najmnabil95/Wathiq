@@ -9,8 +9,9 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, Printer, FileSpreadsheet,
   Building2, ChevronDown, Layers,
   Shield, QrCode, ExternalLink, FileCheck, AlertCircle, ZoomIn, ZoomOut, RotateCw,
-  Sparkles, Camera, ShieldCheck
+  Sparkles, Camera, ShieldCheck, CheckSquare, Square, ListChecks
 } from 'lucide-react';
+
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
 import DocumentScannerModal from '../components/common/DocumentScannerModal';
@@ -47,6 +48,13 @@ export default function DocumentsPage() {
   const [statuses, setStatuses] = useState([]);
   const [confLevels, setConfLevels] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+
+  // ── Batch Operations State ──
+  const [selectedDocIds, setSelectedDocIds] = useState(new Set());
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [batchStatusModalOpen, setBatchStatusModalOpen] = useState(false);
+  const [batchTargetStatusId, setBatchTargetStatusId] = useState('');
+
 
   // Export & Print State
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
@@ -362,7 +370,66 @@ export default function DocumentsPage() {
     } catch { toast.error('فشل الحذف'); }
   };
 
+  // ── Batch Operations Handlers ──
+  const toggleSelectDoc = (id, e) => {
+    if (e) e.stopPropagation();
+    setSelectedDocIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedDocIds.size === docs.length) {
+      setSelectedDocIds(new Set());
+    } else {
+      setSelectedDocIds(new Set(docs.map(d => d.id)));
+    }
+  };
+
+  const handleBatchAction = async (action, extraData = {}) => {
+    const ids = Array.from(selectedDocIds);
+    if (ids.length === 0) return;
+
+    const actionLabels = {
+      approve: 'اعتماد',
+      archive: 'أرشفة',
+      restore: 'استعادة',
+      delete: 'حذف',
+      change_status: 'تحديث حالة',
+    };
+
+    if (!confirm(`هل أنت متأكد من تنفيذ عملية (${actionLabels[action] || action}) على ${ids.length} وثيقة محددة؟`)) {
+      return;
+    }
+
+    setBatchLoading(true);
+    try {
+      const res = await documentsAPI.batch({
+        ids,
+        action,
+        ...extraData,
+      });
+      toast.success(res.data?.message || 'تم تنفيذ العملية الجماعية بنجاح');
+      setSelectedDocIds(new Set());
+      setBatchStatusModalOpen(false);
+      loadDocs();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'فشلت العملية الجماعية');
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
+  const handleExportSelected = () => {
+    const selectedDocsList = docs.filter(d => selectedDocIds.has(d.id));
+    generateCSV(selectedDocsList, `selected_${selectedDocsList.length}_docs`);
+  };
+
   // ── CSV Export Helper ──
+
   const generateCSV = (dataList, filenameSuffix = '') => {
     if (!dataList || dataList.length === 0) {
       toast.error('لا توجد وثائق متاحة للتصدير');
@@ -992,9 +1059,19 @@ export default function DocumentsPage() {
                     className="p-4 space-y-2.5 active:bg-white/5 transition cursor-pointer"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/25">
-                        {doc.document_number}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedDocIds.has(doc.id)}
+                          onChange={e => toggleSelectDoc(doc.id, e)}
+                          onClick={e => e.stopPropagation()}
+                          className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-500 focus:ring-0 cursor-pointer"
+                        />
+                        <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/25">
+                          {doc.document_number}
+                        </span>
+                      </div>
+
                       <div className="flex items-center gap-1.5">
                         <span className={`badge ${status.class || 'badge-gray'}`}>
                           {status.label || doc.status?.label_ar || '—'}
@@ -1078,6 +1155,15 @@ export default function DocumentsPage() {
               <table className="data-table">
                 <thead>
                   <tr>
+                    <th style={{ width: '38px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={docs.length > 0 && selectedDocIds.size === docs.length}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-500 focus:ring-0 cursor-pointer"
+                        title="تحديد الكل"
+                      />
+                    </th>
                     <th onClick={() => handleSort('document_number')} className="cursor-pointer select-none group">
                       <div className="flex items-center gap-1.5">
                         <span>رقم الوثيقة</span>
@@ -1109,8 +1195,21 @@ export default function DocumentsPage() {
                     const status = STATUS_CONFIG[doc.status?.name] || {};
                     const conf   = CONF_CONFIG[doc.confidentiality_level?.name] || {};
                     return (
-                      <tr key={doc.id} className="cursor-pointer group" onClick={() => navigate(`/documents/${doc.id}`)}>
+                      <tr
+                        key={doc.id}
+                        className={`cursor-pointer group transition-colors ${selectedDocIds.has(doc.id) ? 'bg-blue-500/10' : ''}`}
+                        onClick={() => navigate(`/documents/${doc.id}`)}
+                      >
+                        <td onClick={e => e.stopPropagation()} style={{ textAlign: 'center', width: '38px' }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedDocIds.has(doc.id)}
+                            onChange={e => toggleSelectDoc(doc.id, e)}
+                            className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-500 focus:ring-0 cursor-pointer"
+                          />
+                        </td>
                         <td>
+
                           <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/25">
                             {doc.document_number}
                           </span>
@@ -2016,6 +2115,162 @@ export default function DocumentsPage() {
           navigate('/documents/create', { state: { scannedFile: file, scannedPreview: data?.previewUrl } });
         }}
       />
+
+      {/* ── Floating Batch Operations Bar ── */}
+      {selectedDocIds.size > 0 && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-4xl w-[95%] sm:w-auto bg-[#0a1020]/95 backdrop-blur-xl border border-blue-500/40 rounded-2xl shadow-2xl shadow-blue-500/20 p-3 px-4 sm:px-6 flex flex-wrap items-center justify-between sm:justify-start gap-3 animate-fade-in text-white text-xs select-none"
+          style={{ direction: 'rtl' }}
+        >
+          <div className="flex items-center gap-2 font-bold text-blue-300">
+            <CheckSquare size={16} className="text-blue-400" />
+            <span>تم تحديد <span className="font-mono text-sm px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">{selectedDocIds.size}</span> وثيقة</span>
+          </div>
+
+          <div className="h-4 w-px bg-white/10 hidden sm:block" />
+
+          <div className="flex items-center flex-wrap gap-1.5">
+            {hasPermission('documents.approve') && (
+              <button
+                type="button"
+                disabled={batchLoading}
+                onClick={() => handleBatchAction('approve')}
+                className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/30 font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="اعتماد كافة الوثائق المحددة"
+              >
+                <CheckCircle2 size={13} />
+                <span>اعتماد</span>
+              </button>
+            )}
+
+            {hasPermission('documents.archive') && (
+              <button
+                type="button"
+                disabled={batchLoading}
+                onClick={() => handleBatchAction('archive')}
+                className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/30 font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="أرشفة كافة الوثائق المحددة"
+              >
+                <Archive size={13} />
+                <span>أرشفة</span>
+              </button>
+            )}
+
+            {hasPermission('documents.update') && (
+              <button
+                type="button"
+                disabled={batchLoading}
+                onClick={() => setBatchStatusModalOpen(true)}
+                className="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/30 font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="تغيير حالة الوثائق المحددة"
+              >
+                <ListChecks size={13} />
+                <span>تغيير الحالة</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              disabled={batchLoading}
+              onClick={handleExportSelected}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="تصدير الوثائق المحددة إلى ملف Excel/CSV"
+            >
+              <Download size={13} />
+              <span>تصدير CSV</span>
+            </button>
+
+            {hasPermission('documents.delete') && (
+              <button
+                type="button"
+                disabled={batchLoading}
+                onClick={() => handleBatchAction('delete')}
+                className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="حذف الوثائق المحددة"
+              >
+                <Trash2 size={13} />
+                <span>حذف</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              disabled={batchLoading}
+              onClick={() => setSelectedDocIds(new Set())}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition flex items-center gap-1 cursor-pointer"
+              title="إلغاء التحديد"
+            >
+              <X size={13} />
+              <span>إلغاء</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Quick Batch Status Change Modal ── */}
+      {batchStatusModalOpen && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+          style={{ direction: 'rtl' }}
+          onClick={() => setBatchStatusModalOpen(false)}
+        >
+          <div
+            className="bg-[#0c1427] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl text-right space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                <ListChecks size={16} className="text-blue-400" />
+                تغيير حالة الوثائق المحددة ({selectedDocIds.size})
+              </h3>
+              <button
+                type="button"
+                onClick={() => setBatchStatusModalOpen(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-300 block mb-1.5 font-medium">
+                اختر الحالة الجديدة لتطبيقها على كافة الوثائق المحددة:
+              </label>
+              <select
+                value={batchTargetStatusId}
+                onChange={e => setBatchTargetStatusId(e.target.value)}
+                className="form-control text-xs"
+              >
+                <option value="">-- اختر الحالة --</option>
+                {statuses.map(st => (
+                  <option key={st.id} value={st.id}>
+                    {st.label_ar || st.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setBatchStatusModalOpen(false)}
+                className="btn btn-secondary btn-sm"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                disabled={!batchTargetStatusId || batchLoading}
+                onClick={() => handleBatchAction('change_status', { status_id: batchTargetStatusId })}
+                className="btn btn-primary btn-sm flex items-center gap-1.5"
+              >
+                {batchLoading ? 'جاري التطبيق...' : 'تطبيق الحالة الجديدة'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+
   );
 }
