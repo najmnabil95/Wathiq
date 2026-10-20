@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { dashboardAPI } from '../../services/api';
+import { dashboardAPI, notificationsAPI } from '../../services/api';
 import {
   LayoutDashboard, FolderOpen, FolderTree, Users, ShieldCheck,
   Settings, LogOut, Menu, X, Bell, Search, ChevronDown,
   ChevronRight, ChevronLeft, Archive, FileText, Activity, Shield, Building2,
-  User, Sun, Moon, Camera, Plus, ScanLine
+  User, Sun, Moon, Camera, Plus, ScanLine, CheckCircle, XCircle, FileCheck,
+  MessageSquare, GitBranch, CheckCheck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DocumentScannerModal from '../common/DocumentScannerModal';
@@ -63,6 +64,8 @@ export default function AppLayout() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [device, setDevice] = useState('desktop');
   const [pendingCount, setPendingCount] = useState(0);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
   const [theme, setTheme] = useState(() => localStorage.getItem('edms_theme') || 'dark');
   const [globalScannerOpen, setGlobalScannerOpen] = useState(false);
 
@@ -104,7 +107,18 @@ export default function AppLayout() {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Fetch pending approvals count for live notification badge
+  // Fetch notifications & pending approvals count
+  const fetchNotifications = useCallback(() => {
+    notificationsAPI.list()
+      .then(res => {
+        const data = res.data?.data || [];
+        const count = res.data?.unread_count ?? data.filter(n => !n.is_read).length;
+        setNotifications(data);
+        setUnreadNotifsCount(count);
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     let active = true;
     dashboardAPI.stats()
@@ -114,8 +128,37 @@ export default function AppLayout() {
         }
       })
       .catch(() => {});
-    return () => { active = false; };
-  }, [location.pathname]);
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 25000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [fetchNotifications, location.pathname]);
+
+  const handleNotifClick = (notif) => {
+    if (!notif.is_read) {
+      notificationsAPI.markAsRead(notif.id).catch(() => {});
+      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+      setUnreadNotifsCount(c => Math.max(0, c - 1));
+    }
+    setNotifOpen(false);
+    const targetUrl = notif.data?.action_url || (notif.data?.document_id ? `/documents/${notif.data.document_id}` : null);
+    if (targetUrl) {
+      navigate(targetUrl);
+    }
+  };
+
+  const handleMarkAllNotifsRead = async () => {
+    try {
+      await notificationsAPI.markAllRead();
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setUnreadNotifsCount(0);
+      toast.success('تم تحديد جميع الإشعارات كمقروءة');
+    } catch {
+      toast.error('فشل تحديث الإشعارات');
+    }
+  };
 
   // Dynamic page title
   useEffect(() => {
@@ -414,19 +457,23 @@ export default function AppLayout() {
               <button
                 ref={notifBtnRef}
                 id="notif-bell-btn"
-                className={`btn btn-secondary btn-icon relative ${notifOpen ? 'border-blue-500/40 bg-blue-500/08' : ''}`}
+                className={`btn btn-secondary btn-icon relative ${notifOpen ? 'border-cyan-500/40 bg-cyan-500/10' : ''}`}
                 onClick={() => { setNotifOpen(v => !v); setUserMenuOpen(false); }}
                 title="التنبيهات والإشعارات"
               >
                 <Bell size={16} />
-                {pendingCount > 0 ? (
+                {unreadNotifsCount > 0 ? (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-cyan-500 text-[10px] font-bold text-slate-950 flex items-center justify-center shadow-lg shadow-cyan-500/40 animate-pulse">
+                    {unreadNotifsCount > 9 ? '9+' : unreadNotifsCount}
+                  </span>
+                ) : pendingCount > 0 ? (
                   <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-amber-500 text-[10px] font-bold text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/30">
                     {pendingCount > 9 ? '9+' : pendingCount}
                   </span>
                 ) : (
                   <span
                     className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full"
-                    style={{ background: '#3b82f6', boxShadow: '0 0 6px rgba(59,130,246,0.8)', animation: 'pulse-glow 2s infinite' }}
+                    style={{ background: '#06b6d4', boxShadow: '0 0 6px rgba(6,182,212,0.8)', animation: 'pulse-glow 2s infinite' }}
                   />
                 )}
               </button>
@@ -434,7 +481,7 @@ export default function AppLayout() {
               {notifOpen && (
                 <div
                   ref={notifRef}
-                  className="fixed sm:absolute top-[70px] sm:top-auto sm:mt-2 left-3 sm:left-0 right-3 sm:right-auto w-auto sm:w-80 shadow-2xl p-4 z-50 animate-slide-down rounded-2xl border border-slate-700/80"
+                  className="fixed sm:absolute top-[70px] sm:top-auto sm:mt-2 left-3 sm:left-0 right-3 sm:right-auto w-auto sm:w-96 shadow-2xl p-4 z-50 animate-slide-down rounded-2xl border border-slate-700/80"
                   style={{
                     direction: 'rtl',
                     backgroundColor: '#0c1322',
@@ -443,56 +490,110 @@ export default function AppLayout() {
                 >
                   <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
                     <div className="flex items-center gap-2">
-                      <Bell size={14} className="text-blue-400" />
-                      <span className="font-bold text-sm text-slate-100">مركز التنبيهات</span>
-                    </div>
-                    <button onClick={() => setNotifOpen(false)} className="p-1 rounded-lg hover:bg-white/10 transition text-slate-400 hover:text-white">
-                      <X size={13} />
-                    </button>
-                  </div>
-                  <div className="space-y-2 max-h-64 overflow-y-auto no-scrollbar">
-                    {[
-                      {
-                        bg: 'rgba(245,158,11,0.14)',
-                        border: 'rgba(245,158,11,0.3)',
-                        title: pendingCount > 0 ? `طلبات اعتماد بانتظارك (${pendingCount})` : 'طلبات الاعتماد',
-                        desc: pendingCount > 0 ? `يوجد ${pendingCount} وثيقة بحاجة للمراجعة واتخاذ قرار.` : 'لا توجد طلبات اعتماد معلقة حالياً.',
-                        color: '#fcd34d',
-                        to: '/documents?pending=true'
-                      },
-                      {
-                        bg: '#121c32',
-                        border: 'rgba(255,255,255,0.08)',
-                        title: 'سجل النشاط والتدقيق',
-                        desc: 'تم توثيق آخر حركات الدخول والتعديلات.',
-                        color: '#cbd5e1',
-                        to: '/audit'
-                      },
-                      {
-                        bg: 'rgba(59,130,246,0.12)',
-                        border: 'rgba(59,130,246,0.3)',
-                        title: 'حالة النظام سليمة',
-                        desc: 'قاعدة البيانات متصلة ومستقرة.',
-                        color: '#93c5fd',
-                        to: null
-                      },
-                    ].map((n, i) => (
-                      <div
-                        key={i}
-                        onClick={() => { if (n.to) { setNotifOpen(false); navigate(n.to); } }}
-                        className="p-3 rounded-xl transition-all text-right"
-                        style={{
-                          background: n.bg,
-                          border: `1px solid ${n.border}`,
-                          cursor: n.to ? 'pointer' : 'default',
-                        }}
-                        onMouseEnter={e => { if (n.to) e.currentTarget.style.opacity = '0.85'; }}
-                        onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
-                      >
-                        <div className="text-xs font-bold" style={{ color: n.color }}>{n.title}</div>
-                        <div className="text-[11px] mt-0.5 text-slate-400">{n.desc}</div>
+                      <div className="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                        <Bell size={13} />
                       </div>
-                    ))}
+                      <span className="font-bold text-sm text-slate-100">مركز الإشعارات والتنبيهات</span>
+                      {unreadNotifsCount > 0 && (
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                          {unreadNotifsCount} غير مقروء
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {unreadNotifsCount > 0 && (
+                        <button
+                          onClick={handleMarkAllNotifsRead}
+                          className="text-[11px] text-slate-400 hover:text-cyan-300 flex items-center gap-1 transition"
+                          title="تحديد الكل كمقروء"
+                        >
+                          <CheckCheck size={12} />
+                          <span>قراءة الكل</span>
+                        </button>
+                      )}
+                      <button onClick={() => setNotifOpen(false)} className="p-1 rounded-lg hover:bg-white/10 transition text-slate-400 hover:text-white">
+                        <X size={13} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 max-h-80 overflow-y-auto no-scrollbar">
+                    {/* Dynamic notifications from backend */}
+                    {notifications.length > 0 ? (
+                      notifications.map((n) => {
+                        const type = n.data?.type || 'info';
+                        const isRead = n.is_read;
+
+                        const iconMap = {
+                          approval_request: { icon: FileCheck, color: 'text-amber-400', bg: 'bg-amber-500/15', border: 'border-amber-500/30' },
+                          approved:         { icon: CheckCircle, color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/30' },
+                          rejected:         { icon: XCircle, color: 'text-rose-400', bg: 'bg-rose-500/15', border: 'border-rose-500/30' },
+                          comment:          { icon: MessageSquare, color: 'text-sky-400', bg: 'bg-sky-500/15', border: 'border-sky-500/30' },
+                          version:          { icon: GitBranch, color: 'text-purple-400', bg: 'bg-purple-500/15', border: 'border-purple-500/30' },
+                        };
+
+                        const conf = iconMap[type] || { icon: Bell, color: 'text-cyan-400', bg: 'bg-cyan-500/15', border: 'border-cyan-500/30' };
+                        const IconComponent = conf.icon;
+
+                        const dateStr = n.created_at ? new Date(n.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : '';
+
+                        return (
+                          <div
+                            key={n.id}
+                            onClick={() => handleNotifClick(n)}
+                            className={`p-3 rounded-xl transition-all text-right cursor-pointer border ${
+                              isRead
+                                ? 'bg-slate-900/40 border-slate-800/80 hover:bg-slate-800/50 opacity-75 hover:opacity-100'
+                                : 'bg-[#101b33] border-cyan-500/30 hover:bg-[#132140] shadow-sm'
+                            }`}
+                          >
+                            <div className="flex items-start gap-2.5">
+                              <div className={`w-7 h-7 rounded-lg ${conf.bg} ${conf.color} flex items-center justify-center shrink-0 mt-0.5 border ${conf.border}`}>
+                                <IconComponent size={14} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="text-xs font-bold text-white truncate">
+                                    {n.data?.title || 'إشعار جديد'}
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 font-mono shrink-0">
+                                    {dateStr}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-300 mt-0.5 line-clamp-2 leading-relaxed">
+                                  {n.data?.message}
+                                </p>
+                              </div>
+                              {!isRead && (
+                                <span className="w-2 h-2 rounded-full bg-cyan-400 shrink-0 mt-1.5 shadow-[0_0_6px_rgba(6,182,212,0.8)]" />
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="py-8 text-center text-slate-400 space-y-2">
+                        <Bell size={28} className="mx-auto text-slate-600 opacity-60" />
+                        <p className="text-xs font-medium text-slate-400">لا توجد إشعارات جديدة</p>
+                        <p className="text-[11px] text-slate-600">ستصلك هنا تنبيهات فورية عند تعيين مهام أو اعتماد وثائقك.</p>
+                      </div>
+                    )}
+
+                    {/* Pending Approvals Quick Shortcut if any */}
+                    {pendingCount > 0 && (
+                      <div
+                        onClick={() => { setNotifOpen(false); navigate('/documents?pending=true'); }}
+                        className="p-3 rounded-xl transition-all text-right cursor-pointer bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/15 mt-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <FileCheck size={14} className="text-amber-400" />
+                            <span className="text-xs font-bold text-amber-300">طلبات اعتماد بانتظارك ({pendingCount})</span>
+                          </div>
+                          <span className="text-[11px] text-amber-400 underline">عرض الكل</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -188,3 +188,20 @@ export const settingsAPI = {
   statuses:             () => api.get('/statuses'),
   confidentialityLevels:() => api.get('/confidentiality-levels'),
 };
+
+// ─── Notifications ─────────────────────────────────────────────
+export const notificationsAPI = {
+  list:        ()           => api.get('/notifications'),
+  markAsRead:  (id)         => api.put(`/notifications/${id}/read`),
+  markAllRead: ()           => api.post('/notifications/mark-all-read'),
+  delete:      (id)         => api.delete(`/notifications/${id}`),
+};
+
+// ─── Approvals & Workflows ─────────────────────────────────────
+export const approvalsAPI = {
+  list:       (docId)                => api.get(`/documents/${docId}/approvals`),
+  request:    (docId, data)          => api.post(`/documents/${docId}/approvals`, data),
+  decide:     (docId, approvalId, d) => api.put(`/documents/${docId}/approvals/${approvalId}`, d),
+  getPending: ()                     => api.get('/approvals/pending'),
+};
+

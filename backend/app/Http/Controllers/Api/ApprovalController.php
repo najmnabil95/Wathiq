@@ -1,0 +1,234 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Approval;
+use App\Models\Document;
+use App\Models\Status;
+use App\Models\User;
+use App\Services\AuditService;
+use App\Services\NotificationService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class ApprovalController extends Controller
+{
+    public function __construct(
+        private readonly AuditService $auditService,
+        private readonly NotificationService $notificationService,
+    ) {}
+
+    /**
+     * List all approvals for a specific document.
+     */
+    public function index(Request $request, int $documentId): JsonResponse
+    {
+        $this->checkPermission('documents.view');
+
+        $document = Document::findOrFail($documentId);
+        $approvals = $document->approvals()
+            ->with(['approver:id,name,email,avatar,employee_number', 'workflowStep'])
+            ->orderBy('id', 'asc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data'    => $approvals,
+        ]);
+    }
+
+    /**
+     * Request approval / add approval step for a document.
+     */
+    public function store(Request $request, int $documentId): JsonResponse
+    {
+        $this->checkPermission('documents.update');
+
+        $document = Document::findOrFail($documentId);
+
+        $validated = $request->validate([
+            'approver_id'      => ['required', 'exists:users,id'],
+            'workflow_step_id' => ['nullable', 'exists:workflow_steps,id'],
+            'comments'         => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $approver = User::findOrFail($validated['approver_id']);
+
+        // Prevent duplicate pending approval for the same user on this document
+        $existingPending = Approval::where('document_id', $document->id)
+            ->where('approver_id', $approver->id)
+            ->where('status', 'pending')
+            ->exists();
+
+        if ($existingPending) {
+            return response()->json([
+                'success' => false,
+                'message' => 'يوجد بالفعل طلب اعتماد معلق لهذا المستخدم على هذه الوثيقة.',
+            ], 422);
+        }
+
+        $approval = Approval::create([
+            'document_id'      => $document->id,
+            'workflow_step_id' => $validated['workflow_step_id'] ?? null,
+            'approver_id'      => $approver->id,
+            'status'           => 'pending',
+            'comments'         => $validated['comments'] ?? null,
+        ]);
+
+        // Update document status to pending approval if exists
+        $pendingStatus = Status::where('name', 'pending_approval')->orWhere('name', 'under_review')->first();
+        if ($pendingStatus && $document->status?->name !== 'approved') {
+            $document->update(['status_id' => $pendingStatus->id]);
+        }
+
+        // Notify approver
+        $this->notificationService->notifyApprovalRequested($document, $approver, $request->user());
+
+        // Audit log
+        $this->auditService->log(
+            'approval_requested',
+            $document,
+            null,
+            ['approver_id' => $approver->id, 'approver_name' => $approver->name],
+            "Approval requested from {$approver->name} for document {$document->document_number}"
+        );
+
+        $approval->load(['approver:id,name,email,avatar', 'workflowStep']);
+
+        return response()->json([
+            'success' => true,
+            'message' => "تم إرسال طلب الاعتماد إلى {$approver->name} بنجاح وإشعاره فورياً.",
+            'data'    => $approval,
+        ], 201);
+    }
+
+    /**
+     * Decide (Approve or Reject) an approval request.
+     */
+    public function decide(Request $request, int $documentId, int $approvalId): JsonResponse
+    {
+        $document = Document::findOrFail($documentId);
+        $approval = Approval::where('document_id', $documentId)->findOrFail($approvalId);
+
+        $currentUser = $request->user();
+
+        // Check authorization: must be designated approver or super admin or has documents.approve
+        $isDesignated = ($currentUser->id === $approval->approver_id);
+        $hasPerm = $currentUser->isSuperAdmin() || $currentUser->hasPermission('documents.approve');
+
+        if (!$isDesignated && !$hasPerm) {
+            return response()->json([
+                'success' => false,
+                'message' => 'غير مصرح لك باتخاذ قرار بشأن هذا الاعتماد.',
+            ], 403);
+        }
+
+        if ($approval->status !== 'pending') {
+            return response()->json([
+                'success' => false,
+                'message' => 'تم اتخاذ قرار مسبقاً بشأن هذا الطلب.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'decision' => ['required', 'string', 'in:approved,rejected'],
+            'comments' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $decision = $validated['decision'];
+        $comments = $validated['comments'] ?? ($decision === 'approved' ? 'تم الاعتماد' : 'تم الرفض');
+
+        $approval->update([
+            'status'      => $decision,
+            'comments'    => $comments,
+            'approved_at' => now(),
+        ]);
+
+        if ($decision === 'approved') {
+            // Check if any other pending approvals remain on this document
+            $remainingPending = Approval::where('document_id', $document->id)
+                ->where('status', 'pending')
+                ->count();
+
+            if ($remainingPending === 0) {
+                $approvedStatus = Status::where('name', 'approved')->first();
+                if ($approvedStatus) {
+                    $document->update(['status_id' => $approvedStatus->id]);
+                }
+            }
+        } else {
+            // Rejected
+            $rejectedStatus = Status::where('name', 'rejected')->first();
+            if ($rejectedStatus) {
+                $document->update(['status_id' => $rejectedStatus->id]);
+            }
+        }
+
+        // Notify document creator
+        if ($document->creator) {
+            $this->notificationService->notifyApprovalDecision(
+                $document,
+                $document->creator,
+                $currentUser,
+                $decision,
+                $comments
+            );
+        }
+
+        $this->auditService->log(
+            $decision === 'approved' ? 'approve' : 'reject',
+            $document,
+            null,
+            ['approval_id' => $approval->id, 'decision' => $decision],
+            "Document {$document->document_number} {$decision} by {$currentUser->name}"
+        );
+
+        $approval->load(['approver:id,name,email,avatar', 'workflowStep']);
+
+        return response()->json([
+            'success' => true,
+            'message' => $decision === 'approved' ? 'تم اعتماد الوثيقة بنجاح.' : 'تم تسجيل رفض الوثيقة.',
+            'data'    => $approval,
+        ]);
+    }
+
+    /**
+     * Get pending approvals for current user.
+     */
+    public function pending(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $query = Approval::with([
+            'document.documentType',
+            'document.category',
+            'document.status',
+            'document.creator',
+            'workflowStep',
+        ])->where('status', 'pending');
+
+        if (!$user->isSuperAdmin()) {
+            $query->where('approver_id', $user->id);
+        }
+
+        $approvals = $query->latest()->limit(20)->get();
+
+        return response()->json([
+            'success' => true,
+            'count'   => $approvals->count(),
+            'data'    => $approvals,
+        ]);
+    }
+
+    private function checkPermission(string $perm): void
+    {
+        $user = auth()->user() ?? request()->user();
+        if (!$user) {
+            abort(401, 'غير مصرح.');
+        }
+        if (!$user->hasPermission($perm) && !$user->isSuperAdmin()) {
+            abort(403, 'ليس لديك صلاحية للقيام بهذه العملية.');
+        }
+    }
+}

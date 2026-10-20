@@ -13,6 +13,8 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\OrganizationController;
 use App\Http\Controllers\Api\DocumentTypeController;
+use App\Http\Controllers\Api\ApprovalController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\StatusController;
 use App\Http\Controllers\Api\ConfidentialityLevelController;
@@ -69,6 +71,18 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
     Route::get   ('/documents/{id}/versions',    [DocumentVersionController::class, 'index']);
     Route::post  ('/documents/{id}/versions',    [DocumentVersionController::class, 'store']);
     Route::get   ('/documents/{id}/versions/{versionId}/download', [DocumentVersionController::class, 'download']);
+
+    // Approvals & Workflow
+    Route::get   ('/approvals/pending',                        [ApprovalController::class, 'pending']);
+    Route::get   ('/documents/{id}/approvals',                 [ApprovalController::class, 'index']);
+    Route::post  ('/documents/{id}/approvals',                 [ApprovalController::class, 'store']);
+    Route::put   ('/documents/{id}/approvals/{approvalId}',    [ApprovalController::class, 'decide']);
+
+    // Notifications
+    Route::get   ('/notifications',              [NotificationController::class, 'index']);
+    Route::put   ('/notifications/{id}/read',    [NotificationController::class, 'markAsRead']);
+    Route::post  ('/notifications/mark-all-read',[NotificationController::class, 'markAllAsRead']);
+    Route::delete('/notifications/{id}',         [NotificationController::class, 'destroy']);
 
 
     // Attachments & OCR

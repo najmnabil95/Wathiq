@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Document;
 use App\Models\DocumentVersion;
 use App\Services\AuditService;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -15,6 +16,7 @@ class DocumentVersionController extends Controller
 {
     public function __construct(
         private readonly AuditService $auditService,
+        private readonly NotificationService $notificationService,
     ) {}
 
     public function index(int $docId): JsonResponse
@@ -96,6 +98,15 @@ class DocumentVersionController extends Controller
             ['version' => $version->version_number],
             "New version {$version->version_number} created for document {$document->document_number}"
         );
+
+        if ($document->creator && $document->creator_id !== $request->user()->id) {
+            $this->notificationService->notifyNewVersion(
+                $document,
+                $document->creator,
+                $request->user(),
+                $version->version_number
+            );
+        }
 
         $version->load('uploader:id,name,email');
 

@@ -9,6 +9,7 @@ use App\Models\DocumentType;
 use App\Models\Status;
 use App\Services\AuditService;
 use App\Services\DocumentNumberService;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,7 @@ class DocumentController extends Controller
     public function __construct(
         private readonly DocumentNumberService $numberService,
         private readonly AuditService          $auditService,
+        private readonly NotificationService   $notificationService,
     ) {}
 
     // ─── Index — List with filters & pagination ───────────────────
@@ -400,6 +402,15 @@ class DocumentController extends Controller
         ]);
 
         $this->auditService->log('comment', $document, null, ['comment_id' => $comment->id], "Added comment to document {$document->document_number}");
+
+        if ($document->creator && $document->creator_id !== $request->user()->id) {
+            $this->notificationService->notifyNewComment(
+                $document,
+                $document->creator,
+                $request->user(),
+                $validated['comment']
+            );
+        }
 
         return response()->json([
             'success' => true,

@@ -5,6 +5,8 @@ import {
   documentsAPI,
   attachmentsAPI,
   versionsAPI,
+  approvalsAPI,
+  usersAPI,
   auditAPI,
   settingsAPI
 } from '../services/api';
@@ -87,6 +89,80 @@ export default function DocumentDetailPage() {
   const [scannerModalOpen, setScannerModalOpen] = useState(false);
   const [digitalSignatureModalOpen, setDigitalSignatureModalOpen] = useState(false);
   const [watermarkActive, setWatermarkActive] = useState(true);
+
+  // Multi-level Approvals & Workflow states
+  const [requestApprovalModalOpen, setRequestApprovalModalOpen] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [selectedApproverId, setSelectedApproverId] = useState('');
+  const [approvalNotes, setApprovalNotes] = useState('');
+  const [submittingApprovalRequest, setSubmittingApprovalRequest] = useState(false);
+  const [stepDecisionModal, setStepDecisionModal] = useState({ open: false, approval: null, decision: 'approved', comments: '' });
+  const [submittingStepDecision, setSubmittingStepDecision] = useState(false);
+
+  const handleOpenRequestApprovalModal = async () => {
+    setRequestApprovalModalOpen(true);
+    if (availableUsers.length === 0) {
+      try {
+        const res = await usersAPI.list({ per_page: 100 });
+        const list = res.data?.data?.data || res.data?.data || [];
+        setAvailableUsers(list);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const handleSubmitApprovalRequest = async (e) => {
+    e.preventDefault();
+    if (!selectedApproverId) {
+      toast.error('يرجى اختيار المسؤول أو المعتمد المطلوب إحالة الوثيقة إليه');
+      return;
+    }
+    try {
+      setSubmittingApprovalRequest(true);
+      await approvalsAPI.request(id, {
+        approver_id: selectedApproverId,
+        comments: approvalNotes || null,
+      });
+      toast.success('تمت إحالة الوثيقة وإشعار المعتمد بنجاح!');
+      setRequestApprovalModalOpen(false);
+      setSelectedApproverId('');
+      setApprovalNotes('');
+      fetchDocument();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'فشل إرسال طلب الاعتماد');
+    } finally {
+      setSubmittingApprovalRequest(false);
+    }
+  };
+
+  const handleOpenStepDecision = (approval, decision) => {
+    setStepDecisionModal({
+      open: true,
+      approval,
+      decision,
+      comments: decision === 'approved' ? 'معتمد وفق الأصول' : '',
+    });
+  };
+
+  const handleSubmitStepDecision = async (e) => {
+    e.preventDefault();
+    if (!stepDecisionModal.approval) return;
+    try {
+      setSubmittingStepDecision(true);
+      await approvalsAPI.decide(id, stepDecisionModal.approval.id, {
+        decision: stepDecisionModal.decision,
+        comments: stepDecisionModal.comments,
+      });
+      toast.success(stepDecisionModal.decision === 'approved' ? 'تم اعتماد هذه المرحلة بنجاح' : 'تم تسجيل قرار الرفض');
+      setStepDecisionModal({ open: false, approval: null, decision: 'approved', comments: '' });
+      fetchDocument();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'فشل تنفيذ القرار');
+    } finally {
+      setSubmittingStepDecision(false);
+    }
+  };
 
   const handleScanAndUploadAttachment = async (file, scanData) => {
     const formData = new FormData();
@@ -808,6 +884,17 @@ export default function DocumentDetailPage() {
             سجل الإصدارات ({document.versions?.length || 0})
           </button>
           <button
+            onClick={() => setActiveTab('approvals')}
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition shrink-0 whitespace-nowrap ${
+              activeTab === 'approvals'
+                ? 'border-blue-500 text-blue-400 bg-blue-500/5'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <FileCheck className="w-4 h-4 text-emerald-400" />
+            مسار الاعتماد ({document.approvals?.length || 0})
+          </button>
+          <button
             onClick={() => setActiveTab('comments')}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition shrink-0 whitespace-nowrap ${
               activeTab === 'comments'
@@ -1257,71 +1344,219 @@ export default function DocumentDetailPage() {
         </div>
       )}
 
-      {/* ── TAB: VERSIONS ─────────────────────────────────────────── */}
-      {activeTab === 'versions' && (
-        <div className="bg-slate-900/60 rounded-2xl border border-slate-800 overflow-hidden backdrop-blur-md">
-          <div className="p-4 border-b border-slate-800 font-bold text-white flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <GitBranch className="w-5 h-5 text-cyan-400" />
-              سجل إصدارات وتحديثات الوثيقة (Version History)
-            </span>
-            <span className="text-xs font-mono text-slate-400">الإصدارات: {document.versions?.length || 1}</span>
-          </div>
-
-          <div className="p-6">
-            <div className="relative border-r-2 border-slate-800 pr-6 mr-3 space-y-6">
-              {/* Current Version */}
-              <div className="relative">
-                <span className="absolute -right-[31px] top-1 w-4 h-4 rounded-full bg-emerald-500 ring-4 ring-slate-900" />
-                <div className="bg-slate-950/60 border border-emerald-500/30 rounded-2xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">
-                        الإصدار الحالي v{document.versions && document.versions.length > 0 ? (document.versions.length + 1).toFixed(1) : '1.0'}
-                      </span>
-                      <span className="text-xs text-slate-300 font-semibold">{document.title}</span>
-                    </div>
-                    <span className="text-xs text-slate-400 font-mono" style={{ direction: 'ltr' }}>
-                      {document.created_at ? new Date(document.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' }) : '—'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    هذا هو الإصدار المعتمد والنشط حالياً على النظام. تم التوثيق بواسطة: <span className="text-slate-200 font-medium">{document.creator?.name || 'المسؤول'}</span>.
-                  </p>
-                </div>
+      {/* ── TAB: MULTI-LEVEL APPROVAL WORKFLOW ───────────────────────── */}
+      {activeTab === 'approvals' && (
+        <div className="space-y-6">
+          <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-5 sm:p-6 backdrop-blur-md">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-800">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <FileCheck className="w-5 h-5 text-emerald-400" />
+                  سلسلة ومسار الاعتماد متعدد المستويات (Multi-level Approval Workflow)
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  إدارة مراحل المراجعة والاعتماد الرسمية، تتبع قرارات المسؤولين، وتوثيق التوقيعات الرقمية وفق السياسات التنظيمية.
+                </p>
               </div>
 
-              {/* Historical Versions if any */}
-              {document.versions && document.versions.length > 0 ? (
-                document.versions.map((ver, idx) => (
-                  <div key={ver.id} className="relative">
-                    <span className="absolute -right-[31px] top-1 w-4 h-4 rounded-full bg-blue-500/80 ring-4 ring-slate-900" />
-                    <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-4">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded bg-blue-500/15 text-blue-300 text-xs font-mono font-bold">
-                            v{ver.version_number || (idx + 1).toFixed(1)}
-                          </span>
-                          <span className="text-xs font-bold text-white">{ver.file_name || 'تعديل وثائقي'}</span>
-                        </div>
-                        <span className="text-xs text-slate-400 font-mono" style={{ direction: 'ltr' }}>
-                          {ver.created_at ? new Date(ver.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' }) : '—'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 mb-2">{ver.change_summary || 'تحديث أولي للبيانات والمرفقات.'}</p>
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-900">
-                        <span>بواسطة: {ver.uploader?.name || 'المسؤول'}</span>
-                        <span className="font-mono">{ver.file_size ? `${(ver.file_size / 1024).toFixed(1)} KB` : ''}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-xs text-slate-500 p-3 bg-slate-950/30 rounded-xl border border-slate-800/60">
-                  لا توجد تعديلات أو إصدارات سابقة؛ الوثيقة ما زالت بإصدارها الأصلي المعتمد.
-                </div>
+              {(user?.is_super_admin || hasPermission('documents.update') || user?.id === document.created_by) && (
+                <button
+                  type="button"
+                  onClick={handleOpenRequestApprovalModal}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2 transition shadow-lg shadow-emerald-600/20 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  إحالة للاعتماد / مرحلة جديدة
+                </button>
               )}
             </div>
+
+            {/* Workflow Quick Metrics */}
+            {document.approvals && document.approvals.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                <div className="p-3 rounded-xl bg-slate-950/50 border border-slate-800 text-right">
+                  <span className="text-[11px] text-slate-400 font-medium">إجمالي المراحل</span>
+                  <div className="text-lg font-bold text-white mt-1">{document.approvals.length}</div>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-950/50 border border-slate-800 text-right">
+                  <span className="text-[11px] text-emerald-400 font-medium">المراحل المعتمدة</span>
+                  <div className="text-lg font-bold text-emerald-400 mt-1">
+                    {document.approvals.filter(a => a.status === 'approved').length}
+                  </div>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-950/50 border border-slate-800 text-right">
+                  <span className="text-[11px] text-amber-400 font-medium">قيد المراجعة</span>
+                  <div className="text-lg font-bold text-amber-400 mt-1">
+                    {document.approvals.filter(a => a.status === 'pending').length}
+                  </div>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-950/50 border border-slate-800 text-right">
+                  <span className="text-[11px] text-rose-400 font-medium">المرفوضة</span>
+                  <div className="text-lg font-bold text-rose-400 mt-1">
+                    {document.approvals.filter(a => a.status === 'rejected').length}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Approvals Stepper / Timeline */}
+            {document.approvals && document.approvals.length > 0 ? (
+              <div className="relative pr-6 border-r-2 border-slate-800 space-y-6 mr-3">
+                {document.approvals.map((approval, idx) => {
+                  const isPending = approval.status === 'pending';
+                  const isApproved = approval.status === 'approved';
+                  const isRejected = approval.status === 'rejected';
+
+                  const canDecide = isPending && (
+                    user?.is_super_admin ||
+                    user?.id === approval.approver_id ||
+                    hasPermission('documents.approve')
+                  );
+
+                  return (
+                    <div key={approval.id} className="relative">
+                      {/* Timeline Dot */}
+                      <span
+                        className={`absolute -right-[31px] top-3 w-4 h-4 rounded-full ring-4 ring-slate-900 ${
+                          isApproved ? 'bg-emerald-400 shadow-md shadow-emerald-400/50' :
+                          isRejected ? 'bg-rose-400 shadow-md shadow-rose-400/50' :
+                          'bg-amber-400 shadow-md shadow-amber-400/50 animate-pulse'
+                        }`}
+                      />
+
+                      <div className={`rounded-2xl border p-5 transition-all ${
+                        isPending
+                          ? 'bg-slate-950/70 border-amber-500/30 shadow-lg shadow-amber-500/5'
+                          : isApproved
+                          ? 'bg-slate-950/50 border-emerald-500/30 shadow-sm'
+                          : 'bg-slate-950/50 border-rose-500/30'
+                      }`}>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">
+                              المرحلة {idx + 1}
+                            </span>
+
+                            {isApproved && (
+                              <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                تم الاعتماد رسمياً
+                              </span>
+                            )}
+
+                            {isPending && (
+                              <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5" />
+                                بانتظار المراجعة والقرار
+                              </span>
+                            )}
+
+                            {isRejected && (
+                              <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center gap-1.5">
+                                <XCircle className="w-3.5 h-3.5" />
+                                تم رفض الوثيقة
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="text-xs text-slate-400 font-mono" style={{ direction: 'ltr' }}>
+                            {approval.approved_at
+                              ? new Date(approval.approved_at).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' })
+                              : approval.created_at
+                              ? `طلب في: ${new Date(approval.created_at).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' })}`
+                              : '—'}
+                          </div>
+                        </div>
+
+                        {/* Approver Details */}
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 mb-3">
+                          <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-300 font-bold flex items-center justify-center shrink-0 border border-emerald-500/30 text-sm">
+                            {approval.approver?.name?.[0] || 'م'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-sm font-bold text-white truncate">
+                                {approval.approver?.name || 'مسؤول الاعتماد'}
+                              </h4>
+                              {approval.approver?.employee_number && (
+                                <span className="text-[11px] font-mono text-slate-400">
+                                  #{approval.approver.employee_number}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-400 truncate mt-0.5">
+                              {approval.approver?.email}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Approval Comments or Instructions */}
+                        {approval.comments && (
+                          <div className="p-3 rounded-xl bg-slate-900/40 border border-white/5 text-xs text-slate-300 leading-relaxed mb-3">
+                            <span className="text-slate-400 block mb-1 font-semibold text-[11px]">
+                              {isApproved ? 'بيان وملاحظات الاعتماد:' : isRejected ? 'سبب الرفض:' : 'تعليمات الإحالة:'}
+                            </span>
+                            {approval.comments}
+                          </div>
+                        )}
+
+                        {/* Approver Action Buttons */}
+                        {canDecide && (
+                          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800/80">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenStepDecision(approval, 'rejected')}
+                              className="px-3.5 py-1.5 rounded-xl bg-rose-600/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              رفض المرحلة
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDigitalSignatureModalOpen(true);
+                              }}
+                              className="px-3.5 py-1.5 rounded-xl bg-cyan-600/15 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/30 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                              title="اعتماد رسمي بالختم والتوقيع الإلكتروني"
+                            >
+                              <Stamp className="w-3.5 h-3.5" />
+                              ختم وتوقيع إلكتروني
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleOpenStepDecision(approval, 'approved')}
+                              className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition cursor-pointer flex items-center gap-1.5"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" />
+                              اعتماد هذه المرحلة
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-slate-400 space-y-3">
+                <FileCheck className="w-12 h-12 text-slate-600 mx-auto" />
+                <h4 className="text-sm font-bold text-slate-300">لم يتم تحديد مسار اعتماد مخصص بعد</h4>
+                <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                  يمكنك إحالة هذه الوثيقة إلى مدير القسم أو المعتمدين المخولين لتسجيل موافقتهم الرسمية وتوثيقها في النظام.
+                </p>
+                {(user?.is_super_admin || hasPermission('documents.update') || user?.id === document.created_by) && (
+                  <button
+                    type="button"
+                    onClick={handleOpenRequestApprovalModal}
+                    className="btn btn-secondary btn-sm mt-2"
+                  >
+                    + إحالة الوثيقة للاعتماد
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2041,6 +2276,173 @@ export default function DocumentDetailPage() {
                   className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-lg shadow-cyan-600/20 disabled:opacity-50 cursor-pointer"
                 >
                   {versionSubmitting ? 'جاري التوثيق...' : 'اعتماد وتسجيل الإصدار'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        window.document.body
+      )}
+
+      {/* ── REQUEST APPROVAL MODAL ───────────────────────────────────── */}
+      {requestApprovalModalOpen && typeof window !== 'undefined' && window.document?.body && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md"
+          style={{ direction: 'rtl' }}
+          onClick={() => setRequestApprovalModalOpen(false)}
+        >
+          <div
+            className="bg-[#0c1427] border border-emerald-500/30 rounded-3xl w-full max-w-lg shadow-2xl shadow-emerald-500/10 flex flex-col overflow-hidden text-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-[#080d19]">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <FileCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">إحالة الوثيقة لمسار الاعتماد</h3>
+                  <p className="text-[11px] text-slate-400 font-mono">{document.document_number}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRequestApprovalModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitApprovalRequest} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  المسؤول أو المدير المطلوب اعتماده *
+                </label>
+                <select
+                  required
+                  value={selectedApproverId}
+                  onChange={(e) => setSelectedApproverId(e.target.value)}
+                  className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="">-- اختر المستخدم / المعتمد --</option>
+                  {availableUsers.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} {u.department?.name ? `(${u.department.name})` : ''} - {u.email}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1">سيتم إرسال إشعار فوري وتنبيه للمستخدم المختار للمراجعة واتخاذ القرار.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  ملاحظات أو توجيهات الإحالة (اختياري)
+                </label>
+                <textarea
+                  rows={3}
+                  value={approvalNotes}
+                  onChange={(e) => setApprovalNotes(e.target.value)}
+                  placeholder="مثال: يرجى مراجعة بنود العقد والتوقيع للاعتماد النهائي..."
+                  className="w-full bg-[#070d1a] border border-slate-800 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 leading-relaxed"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setRequestApprovalModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingApprovalRequest}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 disabled:opacity-50 cursor-pointer"
+                >
+                  {submittingApprovalRequest ? 'جاري الإحالة...' : 'تأكيد وإرسال طلب الاعتماد'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        window.document.body
+      )}
+
+      {/* ── STEP DECISION MODAL (APPROVE / REJECT) ────────────────────── */}
+      {stepDecisionModal.open && typeof window !== 'undefined' && window.document?.body && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md"
+          style={{ direction: 'rtl' }}
+          onClick={() => setStepDecisionModal(prev => ({ ...prev, open: false }))}
+        >
+          <div
+            className={`bg-[#0c1427] border rounded-3xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden text-right ${
+              stepDecisionModal.decision === 'approved'
+                ? 'border-emerald-500/30 shadow-emerald-500/10'
+                : 'border-rose-500/30 shadow-rose-500/10'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-[#080d19]">
+              <div className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                  stepDecisionModal.decision === 'approved'
+                    ? 'bg-emerald-500/20 text-emerald-400'
+                    : 'bg-rose-500/20 text-rose-400'
+                }`}>
+                  {stepDecisionModal.decision === 'approved' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    {stepDecisionModal.decision === 'approved' ? 'تأكيد اعتماد هذه المرحلة' : 'تأكيد رفض المرحلة'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-mono">{document.document_number}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStepDecisionModal(prev => ({ ...prev, open: false }))}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitStepDecision} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  {stepDecisionModal.decision === 'approved' ? 'ملاحظات الاعتماد (اختياري)' : 'سبب الرفض والملاحظات *'}
+                </label>
+                <textarea
+                  required={stepDecisionModal.decision === 'rejected'}
+                  rows={3}
+                  value={stepDecisionModal.comments}
+                  onChange={(e) => setStepDecisionModal(prev => ({ ...prev, comments: e.target.value }))}
+                  placeholder={stepDecisionModal.decision === 'approved' ? 'معتمد وفق الأصول...' : 'يرجى ذكر سبب الرفض بالتفصيل...'}
+                  className="w-full bg-[#070d1a] border border-slate-800 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 leading-relaxed"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setStepDecisionModal(prev => ({ ...prev, open: false }))}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingStepDecision}
+                  className={`px-5 py-2.5 rounded-xl text-white text-xs font-semibold shadow-lg disabled:opacity-50 cursor-pointer ${
+                    stepDecisionModal.decision === 'approved'
+                      ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20'
+                      : 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/20'
+                  }`}
+                >
+                  {submittingStepDecision ? 'جاري الحفظ...' : stepDecisionModal.decision === 'approved' ? 'اعتماد رسمي' : 'تأكيد الرفض'}
                 </button>
               </div>
             </form>
