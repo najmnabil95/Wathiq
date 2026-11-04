@@ -52,12 +52,23 @@ Artisan::command('edms:check', function () {
     $rows[] = ['Frontend SPA Integration', $frontendStatus];
 
     // 5. Environment
-    $rows[] = ['Environment', config('app.env') . ' (Debug: ' . (config('app.debug') ? 'ON' : 'OFF') . ')'];
+    $env = (string) config('app.env');
+    $debug = (bool) config('app.debug');
+    $rows[] = [
+        'Environment',
+        $env . ' (Debug: ' . ($debug ? 'ON — exposes error details' : 'OFF') . ')',
+    ];
+
+    $environmentSafe = $env === 'production' && !$debug;
 
     $this->table(['Check Item', 'Status'], $rows);
 
-    if ($hasKey && $dbOk && $storageWritable && $hasIndex && $hasAssets) {
+    $systemReady = $hasKey && $dbOk && $storageWritable && $hasIndex && $hasAssets;
+
+    if ($systemReady && $environmentSafe) {
         $this->info("\n [ALL SYSTEMS GO] Your IT-EDMS deployment is ready for production!");
+    } elseif ($systemReady) {
+        $this->warn("\n [ATTENTION] The system is functional, but set APP_ENV=production and APP_DEBUG=false before exposing it to users.");
     } else {
         $this->warn("\n [ATTENTION] Please review the items marked above before opening to users.");
     }
