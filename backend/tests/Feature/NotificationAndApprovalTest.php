@@ -57,7 +57,8 @@ class NotificationAndApprovalTest extends TestCase
         $this->seed();
 
         $admin = User::whereHas('roles', fn($q) => $q->where('name', 'super_admin'))->first() ?? User::first();
-        $approver = User::where('id', '!=', $admin->id)->first() ?? User::factory()->create();
+        $approver = User::whereHas('roles', fn($q) => $q->where('name', 'approver'))->first()
+            ?? User::factory()->create();
 
         $doc = Document::first();
         $this->assertNotNull($doc);

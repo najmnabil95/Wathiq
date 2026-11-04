@@ -145,7 +145,7 @@ class RoleController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $this->authorizeManage($request);
+        $this->authorizePermission($request, ['roles.create', 'roles.manage'], 'غير مصرح لك بإنشاء الأدوار');
 
         // Sanitize machine name if supplied
         if ($request->filled('name')) {
@@ -224,7 +224,7 @@ class RoleController extends Controller
      */
     public function update(Request $request, int $id): JsonResponse
     {
-        $this->authorizeManage($request);
+        $this->authorizePermission($request, ['roles.update', 'roles.manage'], 'غير مصرح لك بتعديل الأدوار');
 
         $role = Role::findOrFail($id);
 
@@ -282,7 +282,7 @@ class RoleController extends Controller
      */
     public function destroy(Request $request, int $id): JsonResponse
     {
-        $this->authorizeManage($request);
+        $this->authorizePermission($request, ['roles.delete', 'roles.manage'], 'غير مصرح لك بحذف الأدوار');
 
         $role = Role::withCount('users')->findOrFail($id);
 
@@ -393,11 +393,27 @@ class RoleController extends Controller
         }
     }
 
-    private function authorizeManage(Request $request): void
+    /**
+     * Allow when the user is a super admin or holds any of the given permissions.
+     */
+    private function authorizePermission(Request $request, array $permissions, string $message): void
     {
         $user = $request->user();
-        if (!$user || (!$user->hasPermission('roles.manage') && !$user->isSuperAdmin())) {
-            abort(403, 'غير مصرح لك بتعديل أو إدارة الأدوار والصلاحيات');
+
+        if (!$user) {
+            abort(403, $message);
         }
+
+        if ($user->isSuperAdmin()) {
+            return;
+        }
+
+        foreach ($permissions as $permission) {
+            if ($user->hasPermission($permission)) {
+                return;
+            }
+        }
+
+        abort(403, $message);
     }
 }

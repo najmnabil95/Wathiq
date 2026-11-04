@@ -4,8 +4,8 @@ namespace App\Services;
 
 use App\Models\AuditLog;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Request as RequestFacade;
 
 class AuditService
@@ -20,7 +20,7 @@ class AuditService
         ?array $newValues = null,
         ?string $description = null
     ): AuditLog {
-        return AuditLog::create([
+        return $this->record([
             'user_id'        => Auth::id(),
             'action'         => $action,
             'auditable_type' => $auditable ? get_class($auditable) : null,
@@ -39,7 +39,7 @@ class AuditService
      */
     public function logLogin(int $userId, string $ip, string $userAgent): void
     {
-        AuditLog::create([
+        $this->record([
             'user_id'     => $userId,
             'action'      => AuditLog::ACTION_LOGIN,
             'ip_address'  => $ip,
@@ -54,7 +54,7 @@ class AuditService
      */
     public function logLogout(int $userId): void
     {
-        AuditLog::create([
+        $this->record([
             'user_id'     => $userId,
             'action'      => AuditLog::ACTION_LOGOUT,
             'ip_address'  => RequestFacade::ip(),
@@ -62,6 +62,66 @@ class AuditService
             'description' => 'User logged out',
             'created_at'  => now(),
         ]);
+    }
+
+    /**
+     * Insert an audit entry and link it into the tamper-evident hash chain.
+     */
+    private function record(array $attributes): AuditLog
+    {
+        return DB::transaction(function () use ($attributes) {
+            $previous     = AuditLog::orderByDesc('id')->lockForUpdate()->first();
+            $previousHash = $previous?->hash;
+
+            $attributes['created_at']    = $attributes['created_at'] ?? now();
+            $attributes['previous_hash'] = $previousHash;
+            $attributes['hash']          = $this->computeHash($attributes, $previousHash);
+
+            return AuditLog::create($attributes);
+        });
+    }
+
+    /**
+     * Deterministic SHA-256 over the entry payload and its predecessor hash.
+     * Must stay stable because verification recomputes it from stored columns.
+     */
+    public function computeHash(array $attributes, ?string $previousHash): string
+    {
+        $createdAt = $attributes['created_at'] ?? null;
+        $createdAt = $createdAt instanceof \DateTimeInterface
+            ? $createdAt->format('Y-m-d H:i:s')
+            : (string) ($createdAt ?? '');
+
+        $payload = implode("\x1F", [
+            $previousHash ?? '',
+            (string) ($attributes['user_id'] ?? ''),
+            (string) ($attributes['action'] ?? ''),
+            (string) ($attributes['auditable_type'] ?? ''),
+            (string) ($attributes['auditable_id'] ?? ''),
+            $this->encodeValue($attributes['old_values'] ?? null),
+            $this->encodeValue($attributes['new_values'] ?? null),
+            (string) ($attributes['ip_address'] ?? ''),
+            (string) ($attributes['user_agent'] ?? ''),
+            (string) ($attributes['description'] ?? ''),
+            $createdAt,
+        ]);
+
+        return hash('sha256', $payload);
+    }
+
+    private function encodeValue(mixed $value): string
+    {
+        if ($value === null) {
+            return 'null';
+        }
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $value = $decoded;
+            }
+        }
+
+        return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: 'null';
     }
 
     /**

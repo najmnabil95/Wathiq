@@ -7,7 +7,7 @@ import {
   Settings, LogOut, Menu, X, Bell, Search, ChevronDown,
   ChevronRight, ChevronLeft, Archive, FileText, Activity, Shield, Building2,
   User, Sun, Moon, Camera, Plus, ScanLine, CheckCircle, XCircle, FileCheck,
-  MessageSquare, GitBranch, CheckCheck
+  MessageSquare, GitBranch, CheckCheck, FileType2, Globe, ArchiveX, Workflow
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DocumentScannerModal from '../common/DocumentScannerModal';
@@ -15,11 +15,16 @@ import DocumentScannerModal from '../common/DocumentScannerModal';
 // ── Navigation Items ──────────────────────────────────────────
 const navItems = [
   { label: 'لوحة التحكم',         icon: LayoutDashboard, to: '/',           exact: true, permission: null },
+  { label: 'سير العمل',           icon: Workflow,        to: '/system-flow', permission: null },
   { label: 'الوثائق',              icon: FileText,        to: '/documents',  permission: 'documents.view' },
+  { label: 'الاستبعاد والاستبقاء', icon: ArchiveX,        to: '/disposition', permission: 'disposition.manage' },
   { label: 'التصنيفات',            icon: FolderTree,      to: '/categories', permission: 'categories.view' },
+  { label: 'أنواع الوثائق',        icon: FileType2,       to: '/document-types', permission: 'document-types.view' },
   { label: 'الأقسام والفروع',      icon: Building2,       to: '/departments',permission: 'departments.view' },
+  { label: 'الجهات الخارجية',      icon: Globe,           to: '/organizations', permission: 'organizations.view' },
   { label: 'المستخدمون',           icon: Users,           to: '/users',      permission: 'users.view' },
   { label: 'الأدوار والصلاحيات',   icon: ShieldCheck,     to: '/roles',      permission: 'roles.view' },
+  { label: 'قوالب سير العمل',      icon: GitBranch,       to: '/workflows',  permission: 'workflows.view' },
   { label: 'سجل العمليات',         icon: Activity,        to: '/audit',      permission: 'audit.view' },
   { label: 'الإعدادات',            icon: Settings,        to: '/settings',   permission: 'settings.view' },
 ];
@@ -27,12 +32,17 @@ const navItems = [
 // Page title map
 const PAGE_TITLES = {
   '/':                    'لوحة التحكم | وثيق IT-EDMS',
+  '/system-flow':         'سير العمل | وثيق IT-EDMS',
   '/documents':           'إدارة الوثائق | وثيق IT-EDMS',
   '/documents/create':    'إنشاء وثيقة جديدة | وثيق IT-EDMS',
+  '/disposition':         'الاستبعاد وجداول الاستبقاء | وثيق IT-EDMS',
   '/categories':          'تصنيفات الوثائق | وثيق IT-EDMS',
+  '/document-types':      'أنواع الوثائق | وثيق IT-EDMS',
   '/departments':         'الأقسام والفروع | وثيق IT-EDMS',
+  '/organizations':       'الجهات الخارجية | وثيق IT-EDMS',
   '/users':               'إدارة المستخدمين | وثيق IT-EDMS',
   '/roles':               'الأدوار والصلاحيات | وثيق IT-EDMS',
+  '/workflows':           'قوالب سير العمل | وثيق IT-EDMS',
   '/audit':               'سجل العمليات والرقابة | وثيق IT-EDMS',
   '/settings':            'إعدادات النظام | وثيق IT-EDMS',
   '/profile':             'الملف الشخصي | وثيق IT-EDMS',
@@ -119,22 +129,26 @@ export default function AppLayout() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    let active = true;
+  const fetchPendingCount = useCallback(() => {
     dashboardAPI.stats()
       .then(res => {
-        if (active && res.data?.data?.pending_approvals !== undefined) {
-          setPendingCount(Number(res.data.data.pending_approvals) || 0);
+        const stats = res.data?.data?.stats;
+        if (stats?.my_pending_approvals !== undefined) {
+          setPendingCount(Number(stats.my_pending_approvals) || 0);
         }
       })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 25000);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [fetchNotifications, location.pathname]);
+    fetchPendingCount();
+    const interval = setInterval(() => {
+      fetchNotifications();
+      fetchPendingCount();
+    }, 25000);
+    return () => clearInterval(interval);
+  }, [fetchNotifications, fetchPendingCount, location.pathname]);
 
   const handleNotifClick = (notif) => {
     if (!notif.is_read) {
@@ -202,6 +216,12 @@ export default function AppLayout() {
     if (item.permission === 'roles.view') {
       return hasPermission('roles.view') || hasPermission('roles.manage');
     }
+    if (item.permission === 'workflows.view') {
+      return hasPermission('workflows.view') || hasPermission('workflows.manage');
+    }
+    if (item.permission === 'document-types.view') {
+      return hasPermission('document-types.view') || hasPermission('document-types.manage');
+    }
     return hasPermission(item.permission);
   };
 
@@ -240,16 +260,16 @@ export default function AppLayout() {
           transform: isMobile ? (sidebarOpen ? 'translateX(0)' : 'translateX(100%)') : 'translateX(0)',
           transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1), transform 0.28s cubic-bezier(0.4,0,0.2,1)',
           overflow: 'hidden',
-          background: 'linear-gradient(180deg, rgba(8,13,28,0.98) 0%, rgba(5,8,18,0.99) 100%)',
+          background: 'var(--app-sidebar-bg)',
           backdropFilter: 'blur(24px)',
-          borderLeft: '1px solid rgba(255,255,255,0.07)',
-          boxShadow: '0 0 60px rgba(0,0,0,0.4)',
+          borderLeft: '1px solid var(--app-sidebar-border)',
+          boxShadow: 'var(--app-sidebar-shadow)',
         }}
       >
         {/* Logo Header with Single Arrow Toggle */}
         <div
           className="flex items-center justify-between px-3 sm:px-4 shrink-0"
-          style={{ height: '66px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+          style={{ height: '66px', borderBottom: '1px solid var(--app-sidebar-border)' }}
         >
           {sidebarOpen || isMobile ? (
             <>
@@ -268,7 +288,7 @@ export default function AppLayout() {
                   <div className="font-black text-white text-sm leading-tight tracking-wider" style={{ letterSpacing: '0.08em' }}>
                     IT-EDMS
                   </div>
-                  <div className="text-[10px] leading-tight font-medium" style={{ color: '#45607a' }}>
+                  <div className="text-[10px] leading-tight font-medium" style={{ color: 'var(--app-logo-sub)' }}>
                     إدارة وأرشفة الوثائق
                   </div>
                 </div>
@@ -334,12 +354,12 @@ export default function AppLayout() {
         </nav>
 
         {/* User Card */}
-        <div className="px-2.5 py-3 shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="px-2.5 py-3 shrink-0" style={{ borderTop: '1px solid var(--app-user-chip-border)' }}>
           <div
             className="flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer press-effect"
             style={{
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.06)',
+              background: 'var(--app-user-chip-bg)',
+              border: '1px solid var(--app-user-chip-border)',
               transition: 'all 0.18s ease',
             }}
             onClick={handleLogout}
@@ -349,8 +369,8 @@ export default function AppLayout() {
               e.currentTarget.style.borderColor = 'rgba(239,68,68,0.15)';
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+              e.currentTarget.style.background = 'var(--app-user-chip-bg)';
+              e.currentTarget.style.borderColor = 'var(--app-user-chip-border)';
             }}
           >
             <div
@@ -361,16 +381,16 @@ export default function AppLayout() {
             </div>
             {(sidebarOpen || isMobile) && (
               <div className="flex-1 overflow-hidden animate-fade-in">
-                <div className="text-[13px] font-semibold truncate" style={{ color: '#d4e0f5' }}>
+                <div className="text-[13px] font-semibold truncate" style={{ color: 'var(--app-user-name)' }}>
                   {user?.name}
                 </div>
-                <div className="text-[11px] truncate" style={{ color: '#45607a' }}>
+                <div className="text-[11px] truncate" style={{ color: 'var(--app-user-role)' }}>
                   {firstRole?.display_name_ar || firstRole?.display_name || 'مستخدم'}
                 </div>
               </div>
             )}
             {(sidebarOpen || isMobile) && (
-              <LogOut size={13} className="flex-shrink-0" style={{ color: '#f87171', opacity: 0.7 }} />
+              <LogOut size={13} className="flex-shrink-0" style={{ color: 'var(--app-logout-icon)', opacity: 0.9 }} />
             )}
           </div>
         </div>
@@ -390,10 +410,10 @@ export default function AppLayout() {
           className="sticky top-0 z-30 flex items-center justify-between px-3 sm:px-5 no-print"
           style={{
             height: '64px',
-            background: 'rgba(5,8,18,0.92)',
+            background: 'var(--app-header-bg)',
             backdropFilter: 'blur(24px)',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
-            boxShadow: '0 1px 30px rgba(0,0,0,0.2)',
+            borderBottom: '1px solid var(--app-header-border)',
+            boxShadow: 'var(--app-header-shadow)',
           }}
         >
           <div className="flex items-center gap-2.5 min-w-0">
@@ -414,11 +434,11 @@ export default function AppLayout() {
             <div className="min-w-0">
               <h1
                 className="font-bold text-sm sm:text-[15px] truncate"
-                style={{ color: '#e8f0ff', margin: 0, letterSpacing: '-0.01em', maxWidth: '240px' }}
+                style={{ color: 'var(--app-heading)', margin: 0, letterSpacing: '-0.01em', maxWidth: '240px' }}
               >
                 {getPageTitle()}
               </h1>
-              <p className="text-[11px] hidden sm:block truncate mt-0.5" style={{ color: '#364a60', margin: 0 }}>
+              <p className="text-[11px] hidden sm:block truncate mt-0.5" style={{ color: 'var(--app-heading-muted)', margin: 0 }}>
                 {new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
             </div>
@@ -484,8 +504,8 @@ export default function AppLayout() {
                   className="fixed sm:absolute top-[70px] sm:top-auto sm:mt-2 left-3 sm:left-0 right-3 sm:right-auto w-auto sm:w-96 shadow-2xl p-4 z-50 animate-slide-down rounded-2xl border border-slate-700/80"
                   style={{
                     direction: 'rtl',
-                    backgroundColor: '#0c1322',
-                    boxShadow: '0 25px 60px -15px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.08)',
+                    backgroundColor: 'var(--app-menu-bg)',
+                    boxShadow: 'var(--app-menu-shadow)',
                   }}
                 >
                   <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
@@ -544,7 +564,7 @@ export default function AppLayout() {
                             className={`p-3 rounded-xl transition-all text-right cursor-pointer border ${
                               isRead
                                 ? 'bg-slate-900/40 border-slate-800/80 hover:bg-slate-800/50 opacity-75 hover:opacity-100'
-                                : 'bg-[#101b33] border-cyan-500/30 hover:bg-[#132140] shadow-sm'
+                                : 'app-notif-unread border-cyan-500/30 shadow-sm'
                             }`}
                           >
                             <div className="flex items-start gap-2.5">
@@ -606,8 +626,8 @@ export default function AppLayout() {
                 id="user-menu-btn"
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all"
                 style={{
-                  background: userMenuOpen ? 'rgba(59,130,246,0.12)' : 'rgba(255,255,255,0.05)',
-                  border: `1px solid ${userMenuOpen ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                  background: userMenuOpen ? 'rgba(59,130,246,0.12)' : 'var(--app-user-chip-bg)',
+                  border: `1px solid ${userMenuOpen ? 'rgba(59,130,246,0.3)' : 'var(--app-user-chip-border)'}`,
                   transition: 'all 0.18s ease',
                 }}
                 onClick={() => { setUserMenuOpen(v => !v); setNotifOpen(false); }}
@@ -623,7 +643,7 @@ export default function AppLayout() {
                 </span>
                 <ChevronDown
                   size={13}
-                  style={{ color: '#8b9cc8', transform: userMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s ease' }}
+                  style={{ color: 'var(--app-user-role)', transform: userMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s ease' }}
                 />
               </button>
 
@@ -633,11 +653,11 @@ export default function AppLayout() {
                   className="absolute top-full left-0 mt-2 w-56 shadow-2xl py-1.5 animate-slide-down rounded-2xl border border-slate-700/80"
                   style={{
                     zIndex: 100,
-                    backgroundColor: '#0c1322',
-                    boxShadow: '0 25px 60px -15px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.08)',
+                    backgroundColor: 'var(--app-menu-bg)',
+                    boxShadow: 'var(--app-menu-shadow)',
                   }}
                 >
-                  <div className="px-4 py-3 bg-[#080d19]/90 rounded-t-xl border-b border-slate-800">
+                  <div className="app-menu-head px-4 py-3 rounded-t-xl border-b border-slate-800">
                     <div className="text-[13px] font-bold text-slate-100">{user?.name}</div>
                     <div className="text-[11px] truncate mt-0.5 text-slate-400 font-mono">{user?.email}</div>
                   </div>
@@ -651,7 +671,7 @@ export default function AppLayout() {
                   </button>
                   <button
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-xs transition-colors hover:bg-rose-500/15 text-rose-400"
-                    style={{ fontFamily: 'Cairo, sans-serif', background: 'none', border: 'none', cursor: 'pointer', direction: 'rtl', borderTop: '1px solid rgba(255,255,255,0.06)' }}
+                    style={{ fontFamily: 'Cairo, sans-serif', background: 'none', border: 'none', cursor: 'pointer', direction: 'rtl', borderTop: '1px solid var(--app-user-chip-border)' }}
                     onClick={handleLogout}
                   >
                     <LogOut size={14} />

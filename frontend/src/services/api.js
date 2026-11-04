@@ -79,9 +79,12 @@ export const documentsAPI = {
   delete:  (id)     => api.delete(`/documents/${id}`),
   archive: (id)     => api.post(`/documents/${id}/archive`),
   restore: (id)     => api.post(`/documents/${id}/restore`),
+  setLegalHold: (id, data) => api.post(`/documents/${id}/legal-hold`, data),
+  forceDelete:  (id)       => api.delete(`/documents/${id}/force`),
   approve: (id, data) => api.post(`/documents/${id}/approve`, data),
   reject:     (id, data) => api.post(`/documents/${id}/reject`, data),
-  addComment: (id, data) => api.post(`/documents/${id}/comments`, data),
+  addComment:    (id, data)        => api.post(`/documents/${id}/comments`, data),
+  deleteComment: (id, commentId)   => api.delete(`/documents/${id}/comments/${commentId}`),
   batch:      (data)     => api.post('/documents/batch', data),
   search:     (params)   => api.get('/search', { params }),
 };
@@ -92,6 +95,7 @@ export const versionsAPI = {
   list:     (docId)                  => api.get(`/documents/${docId}/versions`),
   create:   (docId, formData)        => api.post(`/documents/${docId}/versions`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   download: (docId, versionId)       => api.get(`/documents/${docId}/versions/${versionId}/download`, { responseType: 'blob' }),
+  revert:   (docId, versionId, data) => api.post(`/documents/${docId}/versions/${versionId}/revert`, data || {}),
 };
 
 // ─── Attachments ───────────────────────────────────────────────
@@ -124,10 +128,15 @@ export const documentTypesAPI = {
   create:      (data)   => api.post('/document-types', data),
   update:      (id, data) => api.put(`/document-types/${id}`, data),
   delete:      (id)     => api.delete(`/document-types/${id}`),
-  fields:      (id)     => api.get(`/document-types/${id}/fields`),
+  fields:      (id, params) => api.get(`/document-types/${id}/fields`, { params }),
   addField:    (id, data) => api.post(`/document-types/${id}/fields`, data),
   updateField: (fieldId, data) => api.put(`/document-type-fields/${fieldId}`, data),
   deleteField: (fieldId) => api.delete(`/document-type-fields/${fieldId}`),
+};
+
+// ─── Reports ───────────────────────────────────────────────────
+export const reportsAPI = {
+  exportDocuments: (params) => api.get('/reports/documents/export', { params, responseType: 'blob' }),
 };
 
 // ─── Users ─────────────────────────────────────────────────────
@@ -137,6 +146,8 @@ export const usersAPI = {
   create:      (data)   => api.post('/users', data),
   update:      (id, data) => api.put(`/users/${id}`, data),
   delete:      (id)     => api.delete(`/users/${id}`),
+  changeStatus:(id, data) => api.put(`/users/${id}/status`, data),
+  resetPassword:(id, data) => api.post(`/users/${id}/reset-password`, data),
   updateRoles: (id, roles) => api.put(`/users/${id}/roles`, { roles }),
 };
 
@@ -181,12 +192,25 @@ export const dashboardAPI = {
 export const auditAPI = {
   list:        (params) => api.get('/audit-logs', { params }),
   forDocument: (docId)  => api.get(`/documents/${docId}/audit-logs`),
+  export:      (params) => api.get('/audit-logs/export', { params, responseType: 'blob' }),
+  verifyIntegrity: ()   => api.get('/audit-logs/verify'),
 };
 
 // ─── Settings ──────────────────────────────────────────────────
 export const settingsAPI = {
   statuses:             () => api.get('/statuses'),
   confidentialityLevels:() => api.get('/confidentiality-levels'),
+  get:                  () => api.get('/settings'),
+  update:               (data) => api.put('/settings', data),
+  backup:               () => api.get('/settings/backup'),
+};
+
+// ─── Retention & Disposition ───────────────────────────────────
+export const dispositionAPI = {
+  eligible:        (params)   => api.get('/disposition/eligible', { params }),
+  updateRetention: (docId, d) => api.put(`/documents/${docId}/retention`, d),
+  dispose:         (docId, d) => api.post(`/documents/${docId}/dispose`, d),
+  restore:         (docId, d) => api.post(`/documents/${docId}/disposition/restore`, d),
 };
 
 // ─── Notifications ─────────────────────────────────────────────
@@ -203,5 +227,18 @@ export const approvalsAPI = {
   request:    (docId, data)          => api.post(`/documents/${docId}/approvals`, data),
   decide:     (docId, approvalId, d) => api.put(`/documents/${docId}/approvals/${approvalId}`, d),
   getPending: ()                     => api.get('/approvals/pending'),
+};
+
+// ─── Workflow Templates ────────────────────────────────────────
+export const workflowsAPI = {
+  list:       (params)               => api.get('/workflows', { params }),
+  roles:      ()                     => api.get('/workflows/options/roles'),
+  show:       (id)                   => api.get(`/workflows/${id}`),
+  create:     (data)                 => api.post('/workflows', data),
+  update:     (id, data)             => api.put(`/workflows/${id}`, data),
+  delete:     (id)                   => api.delete(`/workflows/${id}`),
+  addStep:    (id, data)             => api.post(`/workflows/${id}/steps`, data),
+  updateStep: (id, stepId, data)     => api.put(`/workflows/${id}/steps/${stepId}`, data),
+  deleteStep: (id, stepId)           => api.delete(`/workflows/${id}/steps/${stepId}`),
 };
 

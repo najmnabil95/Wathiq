@@ -57,7 +57,7 @@ function DynamicField({ field, value, onChange }) {
     return (
       <div className="flex flex-wrap gap-3">
         {(field.options || []).map(opt => (
-          <label key={opt} className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: '#8b9cc8' }}>
+          <label key={opt} className="flex items-center gap-2 cursor-pointer text-sm text-slate-300">
             <input
               type="checkbox"
               checked={selected.includes(opt)}
@@ -79,7 +79,7 @@ function DynamicField({ field, value, onChange }) {
     return (
       <div className="flex flex-wrap gap-4">
         {(field.options || []).map(opt => (
-          <label key={opt} className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: '#8b9cc8' }}>
+          <label key={opt} className="flex items-center gap-2 cursor-pointer text-sm text-slate-300">
             <input type="radio" name={`field_${field.id}`} value={opt}
                    checked={value === opt} onChange={() => handleChange(opt)}
                    className="accent-blue-500" />
@@ -95,7 +95,8 @@ function DynamicField({ field, value, onChange }) {
 export default function CreateDocumentPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuthStore();
+  const { user, hasPermission } = useAuthStore();
+  const canAssignConfidential = user?.is_super_admin || hasPermission('confidentiality.assign');
 
   const [categories, setCategories]       = useState([]);
   const [docTypes, setDocTypes]           = useState([]);
@@ -386,7 +387,7 @@ export default function CreateDocumentPage() {
             >
               <Upload size={28} style={{ color: '#3b82f6', opacity: 0.7 }} />
               <div className="text-center">
-                <p className="text-sm font-semibold" style={{ color: '#8b9cc8' }}>اسحب الملفات هنا أو انقر للاختيار</p>
+                <p className="text-sm font-semibold text-slate-300">اسحب الملفات هنا أو انقر للاختيار</p>
                 <p className="text-xs mt-1" style={{ color: '#526080' }}>PDF, صور, Word, Excel — حد أقصى 20MB لكل ملف</p>
               </div>
               <input id="file-upload" type="file" multiple className="hidden"
@@ -399,7 +400,7 @@ export default function CreateDocumentPage() {
                 {files.map((f, i) => (
                   <div key={i} className="flex items-center gap-3 glass-sm p-3">
                     <FileText size={16} style={{ color: '#60a5fa' }} />
-                    <span className="flex-1 text-sm truncate" style={{ color: '#cbd5e1' }}>{f.name}</span>
+                    <span className="flex-1 text-sm truncate text-slate-200">{f.name}</span>
                     <span className="text-xs" style={{ color: '#526080' }}>
                       {(f.size / 1024 / 1024).toFixed(2)} MB
                     </span>
@@ -499,18 +500,23 @@ export default function CreateDocumentPage() {
                 const colorMap = { green: '16,185,129', blue: '59,130,246', orange: '249,115,22', red: '239,68,68' };
                 const rgb = colorMap[level.color] || '59,130,246';
                 const selected = form.confidentiality_level_id == level.id;
+                const locked = level.level_order >= 2 && !canAssignConfidential;
                 return (
-                  <label key={level.id} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
-                         style={{ background: selected ? `rgba(${rgb},0.12)` : 'rgba(255,255,255,0.03)',
-                                  border: `1px solid ${selected ? `rgba(${rgb},0.35)` : 'rgba(255,255,255,0.06)'}` }}>
+                  <label key={level.id}
+                         className={`flex items-center gap-3 p-3 rounded-xl transition-all ${locked ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
+                         style={{ background: selected ? `rgba(${rgb},0.12)` : 'var(--app-user-chip-bg)',
+                                  border: `1px solid ${selected ? `rgba(${rgb},0.35)` : 'var(--app-user-chip-border)'}` }}>
                     <input type="radio" name="confidentiality_level_id" value={level.id}
-                           checked={selected} onChange={handleChange} className="sr-only" />
+                           checked={selected} onChange={handleChange} disabled={locked} className="sr-only" />
                     <div className="w-3 h-3 rounded-full flex-shrink-0"
                          style={{ background: `rgb(${rgb})`, boxShadow: selected ? `0 0 8px rgba(${rgb},0.6)` : 'none' }} />
                     <div>
-                      <div className="text-sm font-semibold" style={{ color: selected ? `rgb(${rgb})` : '#8b9cc8' }}>
+                      <div className={`text-sm font-semibold ${selected ? '' : 'text-slate-300'}`} style={selected ? { color: `rgb(${rgb})` } : undefined}>
                         {level.label_ar}
                       </div>
+                      {locked && (
+                        <div className="text-[10px] text-slate-500">يتطلب صلاحية تصنيف السرية</div>
+                      )}
                     </div>
                   </label>
                 );

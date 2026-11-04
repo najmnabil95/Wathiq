@@ -711,7 +711,7 @@ class RolesPermissionsSeeder extends Seeder
             'document-types.view', 'document-types.manage',
             'departments.view', 'departments.manage',
             'organizations.view', 'organizations.manage',
-            'users.view',
+            'users.view', 'users.change_status', 'users.reset_password',
             'roles.view',
             'audit.view', 'audit.export',
             'reports.view', 'reports.export', 'reports.advanced',

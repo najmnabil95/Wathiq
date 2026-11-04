@@ -26,7 +26,7 @@ class ApprovalController extends Controller
     {
         $this->checkPermission('documents.view');
 
-        $document = Document::findOrFail($documentId);
+        $document = Document::findVisibleOrFail($documentId, $request->user());
         $approvals = $document->approvals()
             ->with(['approver:id,name,email,avatar,employee_number', 'workflowStep'])
             ->orderBy('id', 'asc')
@@ -43,9 +43,9 @@ class ApprovalController extends Controller
      */
     public function store(Request $request, int $documentId): JsonResponse
     {
-        $this->checkPermission('documents.update');
+        $this->checkPermission('workflows.submit');
 
-        $document = Document::findOrFail($documentId);
+        $document = Document::findVisibleOrFail($documentId, $request->user());
 
         $validated = $request->validate([
             'approver_id'      => ['required', 'exists:users,id'],
@@ -108,19 +108,19 @@ class ApprovalController extends Controller
      */
     public function decide(Request $request, int $documentId, int $approvalId): JsonResponse
     {
-        $document = Document::findOrFail($documentId);
+        $document = Document::findVisibleOrFail($documentId, $request->user());
         $approval = Approval::where('document_id', $documentId)->findOrFail($approvalId);
 
         $currentUser = $request->user();
 
-        // Check authorization: must be designated approver or super admin or has documents.approve
+        // Only the designated approver may decide a step; super admin retains override
         $isDesignated = ($currentUser->id === $approval->approver_id);
-        $hasPerm = $currentUser->isSuperAdmin() || $currentUser->hasPermission('documents.approve');
+        $isSuperAdmin = $currentUser->isSuperAdmin();
 
-        if (!$isDesignated && !$hasPerm) {
+        if (!$isDesignated && !$isSuperAdmin) {
             return response()->json([
                 'success' => false,
-                'message' => 'غير مصرح لك باتخاذ قرار بشأن هذا الاعتماد.',
+                'message' => 'غير مصرح لك باتخاذ قرار بشأن هذا الاعتماد؛ فهو موجه لمعتمد آخر.',
             ], 403);
         }
 
@@ -135,6 +135,10 @@ class ApprovalController extends Controller
             'decision' => ['required', 'string', 'in:approved,rejected'],
             'comments' => ['nullable', 'string', 'max:1000'],
         ]);
+
+        $this->checkPermission(
+            $validated['decision'] === 'approved' ? 'workflows.approve' : 'workflows.reject'
+        );
 
         $decision = $validated['decision'];
         $comments = $validated['comments'] ?? ($decision === 'approved' ? 'تم الاعتماد' : 'تم الرفض');

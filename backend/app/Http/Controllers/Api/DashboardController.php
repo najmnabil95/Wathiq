@@ -19,10 +19,10 @@ class DashboardController extends Controller
     {
         $user = $request->user() ?? auth()->user();
 
-        // Base query — super admin sees all, others see based on dept
+        // Base query respects department scope and confidentiality clearance
         $baseQuery = Document::query();
-        if ($user && !$user->isSuperAdmin() && !$user->hasRole('it_manager')) {
-            $baseQuery->where('department_id', $user->department_id);
+        if ($user) {
+            $baseQuery->visibleTo($user);
         }
 
         $currentMonth = now()->startOfMonth();
@@ -58,12 +58,11 @@ class DashboardController extends Controller
             ->get();
 
         // Documents by month (last 12 months)
-        $byMonth = DB::table('documents')
+        $byMonth = (clone $baseQuery)
             ->select(
                 DB::raw('DATE_FORMAT(COALESCE(document_date, created_at), "%Y-%m") as month'),
                 DB::raw('count(*) as total')
             )
-            ->whereNull('deleted_at')
             ->where(DB::raw('COALESCE(document_date, created_at)'), '>=', now()->subMonths(11)->startOfMonth())
             ->groupBy('month')
             ->orderBy('month')
@@ -115,13 +114,10 @@ class DashboardController extends Controller
         $user = $request->user();
 
         $query = Document::with(['category', 'status', 'creator', 'department', 'confidentialityLevel'])
+            ->visibleTo($user)
             ->notArchived()
             ->orderByDesc('created_at')
             ->limit(10);
-
-        if (!$user->isSuperAdmin() && !$user->hasRole('it_manager')) {
-            $query->where('department_id', $user->department_id);
-        }
 
         return response()->json([
             'success' => true,
@@ -138,9 +134,11 @@ class DashboardController extends Controller
         $query = Approval::with(['document.category', 'document.status', 'workflowStep'])
             ->where('status', 'pending');
 
-        if (!$user->isSuperAdmin() && !$user->hasRole('it_manager')) {
+        if (!$user->isSuperAdmin() && !$user->hasPermission('documents.view_all_departments')) {
             $query->where('approver_id', $user->id);
         }
+
+        $query->whereHas('document', fn ($q) => $q->visibleTo($user));
 
         $approvals = $query->orderByDesc('created_at')
             ->limit(10)

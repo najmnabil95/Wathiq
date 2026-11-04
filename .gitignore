@@ -13,6 +13,9 @@
 **/public/hot
 **/public/storage
 
+# Local preview artifacts
+.preview/
+
 # Laravel Storage & Cache
 **/storage/*.key
 **/storage/framework/cache/*

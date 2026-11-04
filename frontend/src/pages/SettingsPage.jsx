@@ -1,86 +1,124 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
+import { settingsAPI } from '../services/api';
 import {
-  Settings, Shield, Lock, Database, HardDrive,
-  FileCode, CheckCircle, RefreshCw, Server, AlertCircle,
-  KeyRound, ShieldCheck, DownloadCloud, Terminal
+  Settings, Shield, Lock, FileCode, CheckCircle, Server, DownloadCloud
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+const DEFAULT_SETTINGS = {
+  numbering_pattern: '{CAT}-{YEAR}-{SEQ:4}',
+  retention_years: '7',
+  require_mfa: true,
+  sha_check_enabled: true,
+  watermark_downloads: true,
+};
+
+function readCachedSettings() {
+  try {
+    const saved = localStorage.getItem('edms_system_settings');
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+}
+
 export default function SettingsPage() {
-  const { user } = useAuthStore();
+  const { user, hasPermission } = useAuthStore();
+  const isSuperAdmin = user?.is_super_admin || user?.roles?.some(r => r.name === 'super_admin');
+  const canManage = isSuperAdmin || hasPermission('settings.manage');
+  const canBackup = isSuperAdmin || hasPermission('settings.backup');
 
   const [saving, setSaving] = useState(false);
-  const [numberingPattern, setNumberingPattern] = useState(() => {
-    try {
-      const saved = localStorage.getItem('edms_system_settings');
-      return saved ? JSON.parse(saved).numberingPattern : '{CAT}-{YEAR}-{SEQ:4}';
-    } catch {
-      return '{CAT}-{YEAR}-{SEQ:4}';
-    }
-  });
-  const [retentionYears, setRetentionYears] = useState(() => {
-    try {
-      const saved = localStorage.getItem('edms_system_settings');
-      return saved ? JSON.parse(saved).retentionYears : '7';
-    } catch {
-      return '7';
-    }
-  });
-  const [requireMFA, setRequireMFA] = useState(() => {
-    try {
-      const saved = localStorage.getItem('edms_system_settings');
-      return saved ? JSON.parse(saved).requireMFA : true;
-    } catch {
-      return true;
-    }
-  });
-  const [shaCheckEnabled, setShaCheckEnabled] = useState(() => {
-    try {
-      const saved = localStorage.getItem('edms_system_settings');
-      return saved ? JSON.parse(saved).shaCheckEnabled : true;
-    } catch {
-      return true;
-    }
-  });
+  const [backingUp, setBackingUp] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const handleSave = (e) => {
+  const [numberingPattern, setNumberingPattern] = useState(
+    () => readCachedSettings().numberingPattern || readCachedSettings().numbering_pattern || DEFAULT_SETTINGS.numbering_pattern
+  );
+  const [retentionYears, setRetentionYears] = useState(
+    () => readCachedSettings().retentionYears || readCachedSettings().retention_years || DEFAULT_SETTINGS.retention_years
+  );
+  const [requireMFA, setRequireMFA] = useState(
+    () => readCachedSettings().requireMFA ?? readCachedSettings().require_mfa ?? DEFAULT_SETTINGS.require_mfa
+  );
+  const [shaCheckEnabled, setShaCheckEnabled] = useState(
+    () => readCachedSettings().shaCheckEnabled ?? readCachedSettings().sha_check_enabled ?? DEFAULT_SETTINGS.sha_check_enabled
+  );
+  const [watermarkDownloads, setWatermarkDownloads] = useState(
+    () => readCachedSettings().watermarkDownloads ?? readCachedSettings().watermark_downloads ?? DEFAULT_SETTINGS.watermark_downloads
+  );
+
+  // Load the centrally persisted settings, falling back to cached values
+  useEffect(() => {
+    settingsAPI.get()
+      .then((res) => {
+        const s = res.data?.data || {};
+        if (s.numbering_pattern) setNumberingPattern(s.numbering_pattern);
+        if (s.retention_years !== undefined) setRetentionYears(String(s.retention_years));
+        if (s.require_mfa !== undefined) setRequireMFA(Boolean(s.require_mfa));
+        if (s.sha_check_enabled !== undefined) setShaCheckEnabled(Boolean(s.sha_check_enabled));
+        if (s.watermark_downloads !== undefined) setWatermarkDownloads(Boolean(s.watermark_downloads));
+      })
+      .catch(() => {
+        toast.error('تعذر تحميل الإعدادات من الخادم — يتم عرض آخر نسخة محفوظة محلياً');
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async (e) => {
     e.preventDefault();
+
+    if (!canManage) {
+      toast.error('لا تملك صلاحية تعديل إعدادات النظام');
+      return;
+    }
+
     setSaving(true);
     try {
-      const settingsObj = {
-        numberingPattern,
-        retentionYears,
-        requireMFA,
-        shaCheckEnabled,
-        updatedAt: new Date().toISOString(),
-        updatedBy: user?.name || 'Administrator',
+      const payload = {
+        numbering_pattern: numberingPattern,
+        retention_years: retentionYears,
+        require_mfa: requireMFA,
+        sha_check_enabled: shaCheckEnabled,
+        watermark_downloads: watermarkDownloads,
       };
-      localStorage.setItem('edms_system_settings', JSON.stringify(settingsObj));
-      setTimeout(() => {
-        setSaving(false);
-        toast.success('تم حفظ إعدادات النظام وسياسات الأرشفة بنجاح');
-      }, 350);
+
+      const res = await settingsAPI.update(payload);
+      const saved = res.data?.data || payload;
+
+      localStorage.setItem('edms_system_settings', JSON.stringify({
+        numberingPattern: saved.numbering_pattern,
+        retentionYears: saved.retention_years,
+        requireMFA: saved.require_mfa,
+        shaCheckEnabled: saved.sha_check_enabled,
+        watermarkDownloads: saved.watermark_downloads,
+        updatedAt: new Date().toISOString(),
+      }));
+
+      toast.success('تم حفظ إعدادات النظام وسياسات الأرشفة بنجاح');
     } catch (err) {
+      const errors = err.response?.data?.errors;
+      const firstError = errors ? Object.values(errors)[0]?.[0] : null;
+      toast.error(firstError || err.response?.data?.message || 'حدث خطأ أثناء حفظ الإعدادات');
+    } finally {
       setSaving(false);
-      toast.error('حدث خطأ أثناء حفظ الإعدادات');
     }
   };
 
-  const handleBackup = () => {
+  const handleBackup = async () => {
+    if (!canBackup) {
+      toast.error('لا تملك صلاحية إنشاء النسخ الاحتياطي');
+      return;
+    }
+
+    setBackingUp(true);
     toast.loading('جاري توليد ملف النسخة الاحتياطية وإعدادات النظام...', { id: 'backup' });
-    setTimeout(() => {
-      const backupData = {
-        exportDate: new Date().toISOString(),
-        version: 'IT-EDMS v2.4 Enterprise',
-        exportedBy: user?.email || 'admin',
-        settings: {
-          numberingPattern,
-          retentionYears,
-          requireMFA,
-          shaCheckEnabled,
-        },
-      };
+
+    try {
+      const res = await settingsAPI.backup();
+      const backupData = res.data?.data || {};
+
       const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -90,8 +128,13 @@ export default function SettingsPage() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+
       toast.success('تم إنشاء نسخة النسخ الاحتياطي وتحميلها بنجاح', { id: 'backup' });
-    }, 1000);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'تعذر إنشاء النسخة الاحتياطية', { id: 'backup' });
+    } finally {
+      setBackingUp(false);
+    }
   };
 
   return (
@@ -112,10 +155,12 @@ export default function SettingsPage() {
 
         <button
           onClick={handleBackup}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-sm font-semibold transition"
+          disabled={backingUp || loading || !canBackup}
+          title={canBackup ? 'توليد نسخة احتياطية من إعدادات النظام' : 'يتطلب صلاحية النسخ الاحتياطي'}
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <DownloadCloud className="w-4 h-4 text-emerald-400" />
-          نسخ احتياطي فوري (Backup)
+          {backingUp ? 'جاري التوليد...' : 'نسخ احتياطي فوري (Backup)'}
         </button>
       </div>
 
@@ -216,13 +261,35 @@ export default function SettingsPage() {
                   <span className="text-[11px] text-slate-400">إلزام المستخدم بتأكيد هويته قبل تنزيل أو طباعة الملفات ذات التصنيف الأعلى.</span>
                 </div>
               </label>
+
+              <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/40 border border-slate-800 cursor-pointer hover:border-slate-700 transition">
+                <input
+                  type="checkbox"
+                  checked={watermarkDownloads}
+                  onChange={(e) => setWatermarkDownloads(e.target.checked)}
+                  className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-blue-600 focus:ring-0"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-200 block">ختم العلامة المائية الأمنية على الملفات عند التنزيل</span>
+                  <span className="text-[11px] text-slate-400">يُضمّن الخادم اسم المستخدم ورقم الوثيقة والطابع الزمني داخل ملفات PDF والصور عند تنزيلها لتتبع أي تسريب.</span>
+                </div>
+              </label>
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-slate-800">
+            <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-800">
+              {!canManage ? (
+                <p className="text-[11px] text-amber-400">
+                  وضع العرض فقط — تحتاج صلاحية "إدارة الإعدادات" للحفظ.
+                </p>
+              ) : (
+                <span className="text-[11px] text-slate-500">
+                  {loading ? 'جاري تحميل الإعدادات من الخادم...' : 'الإعدادات محفوظة مركزياً في قاعدة البيانات.'}
+                </span>
+              )}
               <button
                 type="submit"
-                disabled={saving}
-                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition shadow-lg shadow-blue-600/20 disabled:opacity-50"
+                disabled={saving || loading || !canManage}
+                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition shadow-lg shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'جاري الحفظ...' : 'حفظ كافة الإعدادات'}
               </button>

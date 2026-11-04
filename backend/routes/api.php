@@ -18,6 +18,10 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\StatusController;
 use App\Http\Controllers\Api\ConfidentialityLevelController;
+use App\Http\Controllers\Api\WorkflowController;
+use App\Http\Controllers\Api\SettingController;
+use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\DispositionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -63,14 +67,18 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
     Route::get   ('/documents/{id}',             [DocumentController::class, 'show']);
     Route::put   ('/documents/{id}',             [DocumentController::class, 'update']);
     Route::delete('/documents/{id}',             [DocumentController::class, 'destroy']);
+    Route::delete('/documents/{id}/force',       [DocumentController::class, 'forceDelete']);
+    Route::post  ('/documents/{id}/legal-hold',  [DocumentController::class, 'legalHold']);
     Route::post  ('/documents/{id}/archive',     [DocumentController::class, 'archive']);
     Route::post  ('/documents/{id}/restore',     [DocumentController::class, 'restore']);
     Route::post  ('/documents/{id}/approve',     [DocumentController::class, 'approve']);
     Route::post  ('/documents/{id}/reject',      [DocumentController::class, 'reject']);
     Route::post  ('/documents/{id}/comments',    [DocumentController::class, 'addComment']);
+    Route::delete('/documents/{id}/comments/{commentId}', [DocumentController::class, 'deleteComment']);
     Route::get   ('/documents/{id}/versions',    [DocumentVersionController::class, 'index']);
     Route::post  ('/documents/{id}/versions',    [DocumentVersionController::class, 'store']);
     Route::get   ('/documents/{id}/versions/{versionId}/download', [DocumentVersionController::class, 'download']);
+    Route::post  ('/documents/{id}/versions/{versionId}/revert',   [DocumentVersionController::class, 'revert']);
 
     // Approvals & Workflow
     Route::get   ('/approvals/pending',                        [ApprovalController::class, 'pending']);
@@ -78,11 +86,28 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
     Route::post  ('/documents/{id}/approvals',                 [ApprovalController::class, 'store']);
     Route::put   ('/documents/{id}/approvals/{approvalId}',    [ApprovalController::class, 'decide']);
 
+    // Retention & Disposition
+    Route::get   ('/disposition/eligible',                     [DispositionController::class, 'eligible']);
+    Route::put   ('/documents/{id}/retention',                 [DispositionController::class, 'updateRetention']);
+    Route::post  ('/documents/{id}/dispose',                   [DispositionController::class, 'dispose']);
+    Route::post  ('/documents/{id}/disposition/restore',       [DispositionController::class, 'restore']);
+
     // Notifications
     Route::get   ('/notifications',              [NotificationController::class, 'index']);
     Route::put   ('/notifications/{id}/read',    [NotificationController::class, 'markAsRead']);
     Route::post  ('/notifications/mark-all-read',[NotificationController::class, 'markAllAsRead']);
     Route::delete('/notifications/{id}',         [NotificationController::class, 'destroy']);
+
+    // Workflow Templates & Steps
+    Route::get   ('/workflows',                                   [WorkflowController::class, 'index']);
+    Route::post  ('/workflows',                                   [WorkflowController::class, 'store']);
+    Route::get   ('/workflows/options/roles',                     [WorkflowController::class, 'roles']);
+    Route::get   ('/workflows/{id}',                              [WorkflowController::class, 'show']);
+    Route::put   ('/workflows/{id}',                              [WorkflowController::class, 'update']);
+    Route::delete('/workflows/{id}',                              [WorkflowController::class, 'destroy']);
+    Route::post  ('/workflows/{id}/steps',                        [WorkflowController::class, 'storeStep']);
+    Route::put   ('/workflows/{id}/steps/{stepId}',               [WorkflowController::class, 'updateStep']);
+    Route::delete('/workflows/{id}/steps/{stepId}',               [WorkflowController::class, 'destroyStep']);
 
 
     // Attachments & OCR
@@ -95,6 +120,8 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
     Route::post  ('/documents/{id}/attachments/{attId}/ocr',      [AttachmentController::class, 'processOcr']);
 
     // Audit Logs
+    Route::get('/audit-logs/export',             [AuditLogController::class, 'export']);
+    Route::get('/audit-logs/verify',             [AuditLogController::class, 'verifyIntegrity']);
     Route::get('/audit-logs',                    [AuditLogController::class, 'index']);
     Route::get('/documents/{id}/audit-logs',     [AuditLogController::class, 'forDocument']);
 
@@ -125,6 +152,8 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
     Route::get   ('/users/{id}',   [UserController::class, 'show']);
     Route::put   ('/users/{id}',   [UserController::class, 'update']);
     Route::delete('/users/{id}',   [UserController::class, 'destroy']);
+    Route::put   ('/users/{id}/status',         [UserController::class, 'changeStatus']);
+    Route::post  ('/users/{id}/reset-password', [UserController::class, 'resetPassword']);
     Route::put   ('/users/{id}/roles', [UserController::class, 'updateRoles']);
 
     // Roles & Permissions Tree
@@ -150,7 +179,13 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
     Route::put   ('/organizations/{id}', [OrganizationController::class, 'update']);
     Route::delete('/organizations/{id}', [OrganizationController::class, 'destroy']);
 
+    // Reports
+    Route::get('/reports/documents/export', [ReportController::class, 'exportDocuments']);
+
     // Settings
+    Route::get  ('/settings',             [SettingController::class, 'index']);
+    Route::put  ('/settings',             [SettingController::class, 'update']);
+    Route::get  ('/settings/backup',      [SettingController::class, 'backup']);
     Route::get('/statuses',               [StatusController::class, 'index']);
     Route::get('/confidentiality-levels', [ConfidentialityLevelController::class, 'index']);
 });

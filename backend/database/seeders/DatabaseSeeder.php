@@ -25,11 +25,17 @@ class DatabaseSeeder extends Seeder
             // 4. Categories & Document Types
             CategoryDocumentTypeSeeder::class,
 
+            // 4.1 Default Workflow Templates (depends on Types + Roles)
+            WorkflowSeeder::class,
+
             // 5. Admin Users (depends on Roles + Departments)
             AdminUserSeeder::class,
 
             // 6. Rich IT Sample Documents & Approvals
             DummyDataSeeder::class,
+
+            // 7. System settings defaults
+            SettingsSeeder::class,
         ]);
     }
 }

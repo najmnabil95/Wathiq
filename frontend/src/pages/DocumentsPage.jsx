@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { documentsAPI, attachmentsAPI, categoriesAPI, departmentsAPI, settingsAPI } from '../services/api';
+import { documentsAPI, attachmentsAPI, categoriesAPI, departmentsAPI, settingsAPI, reportsAPI } from '../services/api';
 import {
   Plus, Search, Eye, Archive, Trash2,
   FileText, ChevronRight, ChevronLeft, Download, RefreshCw,
@@ -39,6 +39,10 @@ export default function DocumentsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { hasPermission, user } = useAuthStore();
+  const isSuperAdmin = user?.is_super_admin || user?.roles?.some(r => r.name === 'super_admin');
+  const canViewReports = isSuperAdmin || hasPermission('reports.view');
+  const canExportReports = isSuperAdmin || hasPermission('reports.export');
+  const canAdvancedReports = isSuperAdmin || hasPermission('reports.advanced');
 
   const [docs, setDocs] = useState([]);
   const [meta, setMeta] = useState(null);
@@ -185,7 +189,7 @@ export default function DocumentsPage() {
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = window.document.createElement('a');
       link.href = url;
-      link.setAttribute('download', att.file_name || att.original_name || 'attachment');
+      link.setAttribute('download', att.original_name || att.file_name || 'attachment');
       window.document.body.appendChild(link);
       link.click();
       link.remove();
@@ -395,6 +399,7 @@ export default function DocumentsPage() {
 
     const actionLabels = {
       approve: 'اعتماد',
+      reject: 'رفض',
       archive: 'أرشفة',
       restore: 'استعادة',
       delete: 'حذف',
@@ -424,6 +429,10 @@ export default function DocumentsPage() {
   };
 
   const handleExportSelected = () => {
+    if (!canExportReports) {
+      toast.error('تصدير الوثائق يتطلب صلاحية تصدير التقارير');
+      return;
+    }
     const selectedDocsList = docs.filter(d => selectedDocIds.has(d.id));
     generateCSV(selectedDocsList, `selected_${selectedDocsList.length}_docs`);
   };
@@ -431,6 +440,10 @@ export default function DocumentsPage() {
   // ── CSV Export Helper ──
 
   const generateCSV = (dataList, filenameSuffix = '') => {
+    if (!canExportReports) {
+      toast.error('تصدير الوثائق يتطلب صلاحية تصدير التقارير');
+      return;
+    }
     if (!dataList || dataList.length === 0) {
       toast.error('لا توجد وثائق متاحة للتصدير');
       return;
@@ -485,45 +498,60 @@ export default function DocumentsPage() {
 
   const handleExportCurrentPage = () => {
     setExportDropdownOpen(false);
+    if (!canExportReports) {
+      toast.error('تصدير الوثائق يتطلب صلاحية تصدير التقارير');
+      return;
+    }
     generateCSV(docs, `page_${meta?.current_page || 1}`);
   };
 
   const handleExportAll = async () => {
     setExportDropdownOpen(false);
+
+    if (!canAdvancedReports) {
+      toast.error('تصدير كافة النتائج يتطلب صلاحية "التقارير المتقدمة"');
+      return;
+    }
+
     setIsExporting(true);
     const toastId = toast.loading('جاري تجهيز وتصدير كافة الوثائق المطابقة...');
     try {
-      const params = { ...filters, page: 1, per_page: 500 };
-      if (!params.q) delete params.q;
-      if (!params.category_id) delete params.category_id;
-      if (!params.category_code) delete params.category_code;
-      if (!params.department_id) delete params.department_id;
-      if (!params.status) delete params.status;
-      if (!params.pending) delete params.pending;
-      if (!params.status_id) delete params.status_id;
-      if (!params.confidentiality_level_id) delete params.confidentiality_level_id;
-      if (!params.date_from) delete params.date_from;
-      if (!params.date_to) delete params.date_to;
+      const params = { ...filters, bulk: 1 };
+      ['page', 'per_page', 'sort', 'dir'].forEach((key) => delete params[key]);
+      ['q', 'category_id', 'category_code', 'department_id', 'status', 'status_id',
+        'confidentiality_level_id', 'date_from', 'date_to'].forEach((key) => {
+        if (!params[key]) delete params[key];
+      });
 
-      const res = await documentsAPI.list(params);
-      const allDocs = res.data?.data?.data || [];
-      if (allDocs.length === 0) {
-        toast.dismiss(toastId);
-        toast.error('لا توجد وثائق مطابقة للتصدير');
-        return;
-      }
-      toast.dismiss(toastId);
-      generateCSV(allDocs, `all_filtered_${new Date().toISOString().slice(0, 10)}`);
+      const res = await reportsAPI.exportDocuments(params);
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `edms_documents_all_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      const exportedCount = res.headers?.['x-exported-count'];
+      toast.success(`تم تصدير ${exportedCount || ''} وثيقة بنجاح`.replace('  ', ' '));
     } catch (err) {
-      toast.dismiss(toastId);
-      toast.error('فشل تصدير الوثائق');
+      toast.error(err.response?.data?.message || 'فشل تصدير الوثائق');
     } finally {
+      toast.dismiss(toastId);
       setIsExporting(false);
     }
   };
 
   const handleOpenPrintModal = () => {
     setExportDropdownOpen(false);
+
+    if (!canViewReports) {
+      toast.error('معاينة وطباعة التقارير تتطلب صلاحية عرض التقارير');
+      return;
+    }
+
     const d = new Date();
     const dateCode = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
     const randCode = Math.floor(1000 + Math.random() * 9000);
@@ -623,6 +651,7 @@ export default function DocumentsPage() {
 
         <div className="flex items-center gap-2">
           {/* Export Dropdown */}
+          {(canViewReports || canExportReports || canAdvancedReports) && (
           <div className="relative" ref={exportRef}>
             <button
               type="button"
@@ -638,8 +667,7 @@ export default function DocumentsPage() {
 
             {exportDropdownOpen && (
               <div
-                className="absolute left-0 sm:right-auto sm:left-0 top-full mt-2 w-64 glass-card p-1.5 rounded-xl shadow-2xl z-30 animate-scale-in"
-                style={{ background: '#0d1527', border: '1px solid rgba(255,255,255,0.1)' }}
+                className="app-dropdown absolute left-0 sm:right-auto sm:left-0 top-full mt-2 w-64 p-1.5 rounded-xl shadow-2xl z-30 animate-scale-in"
               >
                 <div className="px-3 py-2 border-b border-white/5 mb-1">
                   <p className="text-xs font-bold text-slate-200">خيارات تصدير الوثائق</p>
@@ -648,7 +676,9 @@ export default function DocumentsPage() {
 
                 <button
                   onClick={handleExportCurrentPage}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-right rounded-lg hover:bg-blue-500/10 hover:text-blue-400 text-xs text-slate-200 transition"
+                  disabled={!canExportReports}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-right rounded-lg hover:bg-blue-500/10 hover:text-blue-400 text-xs text-slate-200 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                  title={canExportReports ? 'تصدير الصفحة الحالية' : 'يتطلب صلاحية تصدير التقارير'}
                 >
                   <FileSpreadsheet size={15} className="text-emerald-400" />
                   <div>
@@ -659,12 +689,14 @@ export default function DocumentsPage() {
 
                 <button
                   onClick={handleExportAll}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-right rounded-lg hover:bg-blue-500/10 hover:text-blue-400 text-xs text-slate-200 transition"
+                  disabled={!canAdvancedReports}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-right rounded-lg hover:bg-blue-500/10 hover:text-blue-400 text-xs text-slate-200 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                  title={canAdvancedReports ? 'تصدير كافة النتائج' : 'يتطلب صلاحية التقارير المتقدمة'}
                 >
                   <Download size={15} className="text-blue-400" />
                   <div>
-                    <div className="font-semibold">تصدير كافة النتائج المطابقة (حتى 500)</div>
-                    <div className="text-[10px] text-slate-400">ملف شامل لكافة الفلاتر المحددة</div>
+                    <div className="font-semibold">تصدير كافة النتائج المطابقة</div>
+                    <div className="text-[10px] text-slate-400">ملف شامل لكل الفلاتر (يتطلب تقارير متقدمة)</div>
                   </div>
                 </button>
 
@@ -672,7 +704,9 @@ export default function DocumentsPage() {
 
                 <button
                   onClick={handleOpenPrintModal}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-right rounded-lg hover:bg-indigo-500/10 hover:text-indigo-400 text-xs text-slate-200 transition"
+                  disabled={!canViewReports}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-right rounded-lg hover:bg-indigo-500/10 hover:text-indigo-400 text-xs text-slate-200 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                  title={canViewReports ? 'معاينة وطباعة التقرير' : 'يتطلب صلاحية عرض التقارير'}
                 >
                   <Printer size={15} className="text-indigo-400" />
                   <div>
@@ -683,6 +717,7 @@ export default function DocumentsPage() {
               </div>
             )}
           </div>
+          )}
 
           <button
             type="button"
@@ -952,7 +987,7 @@ export default function DocumentsPage() {
 
         {/* ── Expanded Filters Panel ── */}
         {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 pt-3" style={{ borderTop: '1px solid var(--app-user-chip-border)' }}>
             <div>
               <label className="form-label text-xs">التصنيف الموضوعي</label>
               <select
@@ -1431,8 +1466,9 @@ export default function DocumentsPage() {
                 <button
                   type="button"
                   onClick={() => generateCSV(reportDocs, `report_${reportScope}`)}
-                  className="btn btn-secondary btn-sm flex items-center gap-1.5"
-                  title="تصدير بيانات هذا التقرير إلى ملف Excel"
+                  disabled={!canExportReports}
+                  className="btn btn-secondary btn-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={canExportReports ? 'تصدير بيانات هذا التقرير إلى ملف Excel' : 'يتطلب صلاحية تصدير التقارير'}
                 >
                   <FileSpreadsheet size={15} className="text-emerald-400" />
                   <span className="hidden sm:inline">Excel/CSV</span>
@@ -1746,7 +1782,7 @@ export default function DocumentsPage() {
                     <FileText size={15} className="text-blue-400 shrink-0" />
                     <span className="font-medium truncate">
                       {quickPreviewAttachment
-                        ? (quickPreviewAttachment.file_name || quickPreviewAttachment.original_name)
+                        ? (quickPreviewAttachment.original_name || quickPreviewAttachment.file_name)
                         : (quickPreviewLoading ? 'جاري فحص المرفقات...' : 'معاينة الوثيقة')}
                     </span>
                     {quickPreviewAttachment?.file_size && (
@@ -1995,7 +2031,7 @@ export default function DocumentsPage() {
                             <div className="min-w-0 flex items-center gap-2 truncate">
                               <FileText size={14} className={isSelected ? 'text-blue-400' : 'text-slate-400'} />
                               <div className="truncate">
-                                <p className="font-medium truncate">{att.file_name || att.original_name}</p>
+                                <p className="font-medium truncate">{att.original_name || att.file_name}</p>
                                 <span className="text-[10px] text-slate-500 font-mono">
                                   {Math.round((att.file_size || 0) / 1024)} KB
                                 </span>
@@ -2143,6 +2179,19 @@ export default function DocumentsPage() {
               </button>
             )}
 
+            {hasPermission('documents.reject') && (
+              <button
+                type="button"
+                disabled={batchLoading}
+                onClick={() => handleBatchAction('reject', { comment: 'رفض جماعي من شاشة إدارة الوثائق' })}
+                className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="رفض الوثائق المحددة"
+              >
+                <XCircle size={13} />
+                <span>رفض</span>
+              </button>
+            )}
+
             {hasPermission('documents.archive') && (
               <button
                 type="button"
@@ -2156,7 +2205,7 @@ export default function DocumentsPage() {
               </button>
             )}
 
-            {hasPermission('documents.update') && (
+            {hasPermission('documents.change_status') && (
               <button
                 type="button"
                 disabled={batchLoading}
@@ -2169,16 +2218,18 @@ export default function DocumentsPage() {
               </button>
             )}
 
-            <button
-              type="button"
-              disabled={batchLoading}
-              onClick={handleExportSelected}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              title="تصدير الوثائق المحددة إلى ملف Excel/CSV"
-            >
-              <Download size={13} />
-              <span>تصدير CSV</span>
-            </button>
+            {canExportReports && (
+              <button
+                type="button"
+                disabled={batchLoading}
+                onClick={handleExportSelected}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="تصدير الوثائق المحددة إلى ملف Excel/CSV"
+              >
+                <Download size={13} />
+                <span>تصدير CSV</span>
+              </button>
+            )}
 
             {hasPermission('documents.delete') && (
               <button

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { auditAPI } from '../services/api';
+import { useAuthStore } from '../store/authStore';
 import {
   Activity, Shield, Search, Filter, Calendar, User,
   FileText, Clock, Download, CheckCircle, AlertTriangle,
-  Eye, RefreshCw, X, ArrowUpDown
+  Eye, RefreshCw, X, ArrowUpDown, ShieldCheck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -24,8 +25,14 @@ const formatEnglishDate = (dateStr) => {
 };
 
 export default function AuditPage() {
+  const { hasPermission, user } = useAuthStore();
+  const canExportAudit = user?.is_super_admin || hasPermission('audit.export');
+  const canVerifyAudit = user?.is_super_admin || hasPermission('audit.verify_integrity');
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [integrity, setIntegrity] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [actionFilter, setActionFilter] = useState('');
   const [selectedLog, setSelectedLog] = useState(null);
@@ -51,35 +58,59 @@ export default function AuditPage() {
   };
 
   const actionLabels = {
-    document_created: 'إنشاء وثيقة جديدة',
-    document_updated: 'تعديل بيانات وثيقة',
-    document_deleted: 'حذف وثيقة',
-    document_approved: 'اعتماد وثيقة',
-    document_rejected: 'رفض وثيقة',
-    document_archived: 'أرشفة وثيقة',
-    document_restored: 'استعادة وثيقة',
-    document_viewed: 'معاينة / اطلاع',
-    attachment_uploaded: 'رفع مرفق جديد',
-    attachment_downloaded: 'تحميل ملف مرفق',
-    attachment_deleted: 'حذف ملف مرفق',
-    login_success: 'تسجيل دخول ناجح',
-    login_failed: 'محاولة دخول فاشلة',
+    create: 'إنشاء سجل جديد',
+    update: 'تعديل بيانات',
+    update_status: 'تغيير حالة',
+    delete: 'حذف سجل',
+    archive: 'أرشفة',
+    restore: 'استعادة',
+    approve: 'اعتماد',
+    reject: 'رفض',
+    view: 'معاينة / اطلاع',
+    comment: 'إضافة ملاحظة',
+    upload: 'رفع مرفق جديد',
+    download: 'تحميل ملف',
+    'version.create': 'تسجيل إصدار جديد',
+    approval_requested: 'طلب اعتماد',
+    'ocr.process': 'معالجة واستخراج النص',
+    'workflow.create': 'إنشاء مسار عمل',
+    'workflow.update': 'تعديل مسار عمل',
+    'workflow.delete': 'حذف مسار عمل',
+    'workflow_step.create': 'إضافة مرحلة للمسار',
+    'workflow_step.update': 'تعديل مرحلة في المسار',
+    'workflow_step.delete': 'حذف مرحلة من المسار',
+    'reports.export': 'تصدير تقرير',
+    'audit.export': 'تصدير سجل التدقيق',
+    login: 'تسجيل دخول',
+    logout: 'تسجيل خروج',
   };
 
   const actionColors = {
-    document_created: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-    document_updated: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-    document_deleted: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
-    document_approved: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-    document_rejected: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
-    document_archived: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-    document_restored: 'bg-teal-500/10 text-teal-400 border-teal-500/30',
-    document_viewed: 'bg-slate-700/40 text-slate-300 border-slate-600',
-    attachment_uploaded: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
-    attachment_downloaded: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
-    attachment_deleted: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
-    login_success: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-    login_failed: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+    create: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+    update: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+    update_status: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+    delete: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+    archive: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+    restore: 'bg-teal-500/10 text-teal-400 border-teal-500/30',
+    approve: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+    reject: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+    view: 'bg-slate-700/40 text-slate-300 border-slate-600',
+    comment: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+    upload: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
+    download: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
+    'version.create': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
+    approval_requested: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+    'ocr.process': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
+    'workflow.create': 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+    'workflow.update': 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+    'workflow.delete': 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+    'workflow_step.create': 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+    'workflow_step.update': 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+    'workflow_step.delete': 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+    'reports.export': 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
+    'audit.export': 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
+    login: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+    logout: 'bg-slate-700/40 text-slate-300 border-slate-600',
   };
 
   const logList = Array.isArray(logs) ? logs : [];
@@ -89,35 +120,52 @@ export default function AuditPage() {
       log.description?.toLowerCase().includes(q) ||
       log.user?.name?.toLowerCase().includes(q) ||
       log.ip_address?.toLowerCase().includes(q) ||
-      log.document?.title?.toLowerCase().includes(q) ||
-      log.document?.document_number?.toLowerCase().includes(q)
+      log.auditable?.title?.toLowerCase().includes(q) ||
+      log.auditable?.document_number?.toLowerCase().includes(q)
     );
   });
 
-  const exportCSV = () => {
-    if (filteredLogs.length === 0) {
-      toast.error('لا توجد بيانات لتصديرها');
-      return;
+  const exportCSV = async () => {
+    try {
+      setExporting(true);
+      const params = {};
+      if (actionFilter) params.action = actionFilter;
+      const res = await auditAPI.export(params);
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `edms_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      const count = res.headers?.['x-exported-count'];
+      toast.success(count ? `تم تصدير ${count} سجل تدقيق بنجاح` : 'تم تصدير سجل التدقيق بنجاح');
+    } catch (err) {
+      console.error(err);
+      toast.error('فشل تصدير سجل التدقيق');
+    } finally {
+      setExporting(false);
     }
-    const headers = ['التاريخ', 'المستخدم', 'نوع العملية', 'الوصف', 'عنوان الوثيقة', 'IP'];
-    const rows = filteredLogs.map((l) => [
-      l.created_at || '',
-      l.user?.name || l.user_name || 'النظام',
-      l.action || '',
-      `"${(l.description || '').replace(/"/g, '""')}"`,
-      `"${(l.document?.title || '').replace(/"/g, '""')}"`,
-      l.ip_address || '',
-    ]);
+  };
 
-    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `edms_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    toast.success('تم تصدير سجل التدقيق إلى ملف CSV بنجاح');
+  const verifyIntegrity = async () => {
+    try {
+      setVerifying(true);
+      const res = await auditAPI.verifyIntegrity();
+      const result = res.data?.data || null;
+      setIntegrity(result);
+      if (result?.valid) {
+        toast.success('سلسلة سجل التدقيق سليمة ولم يتم اكتشاف أي تلاعب');
+      } else {
+        toast.error('تم اكتشاف خلل في نزاهة سجل التدقيق');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'فشل التحقق من نزاهة السجل');
+    } finally {
+      setVerifying(false);
+    }
   };
 
   return (
@@ -144,15 +192,70 @@ export default function AuditPage() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
-          <button
-            onClick={exportCSV}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-sm font-semibold transition"
-          >
-            <Download className="w-4 h-4" />
-            تصدير CSV
-          </button>
+          {canVerifyAudit && (
+            <button
+              onClick={verifyIntegrity}
+              disabled={verifying}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+              title="إعادة احتساب سلسلة التجزئة SHA-256 والتحقق من عدم التلاعب بالسجلات"
+            >
+              <ShieldCheck className={`w-4 h-4 ${verifying ? 'animate-pulse' : ''}`} />
+              {verifying ? 'جاري التحقق...' : 'التحقق من النزاهة'}
+            </button>
+          )}
+          {canExportAudit && (
+            <button
+              onClick={exportCSV}
+              disabled={exporting}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download className={`w-4 h-4 ${exporting ? 'animate-pulse' : ''}`} />
+              {exporting ? 'جاري التصدير...' : 'تصدير CSV'}
+            </button>
+          )}
         </div>
       </div>
+
+      {integrity && (
+        <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl border backdrop-blur-md ${
+          integrity.valid
+            ? 'bg-emerald-950/30 border-emerald-500/40'
+            : 'bg-rose-950/30 border-rose-500/40'
+        }`}>
+          <div className="flex items-start gap-3">
+            <div className={`p-2 rounded-xl border shrink-0 ${
+              integrity.valid
+                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+            }`}>
+              {integrity.valid ? <ShieldCheck className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+            </div>
+            <div>
+              <h3 className={`text-sm font-bold ${integrity.valid ? 'text-emerald-300' : 'text-rose-300'}`}>
+                {integrity.valid
+                  ? 'سلسلة سجل التدقيق سليمة (SHA-256 Hash Chain Verified)'
+                  : `تم اكتشاف خلل في نزاهة السجل عند القيد #${integrity.broken_at}`}
+              </h3>
+              <p className="text-xs text-slate-300 mt-0.5">
+                {integrity.reason || `تم التحقق من ${integrity.verified_entries} قيداً موقّعاً رقمياً من أصل ${integrity.scanned_entries} قيداً مفحوصاً.`}
+              </p>
+              {integrity.legacy_entries > 0 && (
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  قيود سابقة للتفعيل (بدون بصمة): {integrity.legacy_entries}
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIntegrity(null)}
+            className="self-start sm:self-center p-1.5 rounded-lg bg-slate-800/70 hover:bg-slate-700 text-slate-400 hover:text-white transition shrink-0"
+            title="إغلاق النتيجة"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* ── Filters Bar ────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center justify-between">
@@ -174,14 +277,20 @@ export default function AuditPage() {
             className="w-full sm:w-auto bg-slate-900/80 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-blue-500"
           >
             <option value="">جميع أنواع العمليات</option>
-            <option value="document_created">إنشاء وثيقة</option>
-            <option value="document_updated">تعديل وثيقة</option>
-            <option value="document_approved">اعتماد وثيقة</option>
-            <option value="document_rejected">رفض وثيقة</option>
-            <option value="document_archived">أرشفة وثيقة</option>
-            <option value="attachment_uploaded">رفع مرفق</option>
-            <option value="attachment_downloaded">تحميل مرفق</option>
-            <option value="login_success">تسجيل الدخول</option>
+            <option value="create">إنشاء سجل</option>
+            <option value="update">تعديل بيانات</option>
+            <option value="update_status">تغيير حالة</option>
+            <option value="approve">اعتماد</option>
+            <option value="reject">رفض</option>
+            <option value="archive">أرشفة</option>
+            <option value="restore">استعادة</option>
+            <option value="delete">حذف</option>
+            <option value="upload">رفع مرفق</option>
+            <option value="download">تحميل ملف</option>
+            <option value="version.create">تسجيل إصدار</option>
+            <option value="approval_requested">طلب اعتماد</option>
+            <option value="login">تسجيل الدخول</option>
+            <option value="logout">تسجيل الخروج</option>
           </select>
         </div>
 
@@ -241,9 +350,9 @@ export default function AuditPage() {
                       </td>
 
                       <td className="p-4 text-xs font-mono text-slate-400">
-                        {log.document ? (
+                        {log.auditable?.document_number ? (
                           <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-blue-400">
-                            {log.document.document_number}
+                            {log.auditable.document_number}
                           </span>
                         ) : (
                           '—'

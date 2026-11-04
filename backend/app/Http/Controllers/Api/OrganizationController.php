@@ -14,6 +14,8 @@ class OrganizationController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $this->checkPermission('organizations.view');
+
         return response()->json([
             'success' => true,
             'data'    => Organization::when($request->input('type'), fn ($q, $v) => $q->ofType($v))
@@ -24,7 +26,12 @@ class OrganizationController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        return response()->json(['success' => true, 'data' => Organization::findOrFail($id)]);
+        $this->checkPermission('organizations.view');
+
+        return response()->json([
+            'success' => true,
+            'data'    => Organization::withCount('documents')->findOrFail($id),
+        ]);
     }
 
     public function store(Request $request): JsonResponse
@@ -95,8 +102,12 @@ class OrganizationController extends Controller
 
     private function checkPermission(string $perm): void
     {
-        if (!request()->user()->hasPermission($perm) && !request()->user()->isSuperAdmin()) {
-            abort(403);
+        $user = request()->user();
+        if (!$user) {
+            abort(401, 'غير مصرح.');
+        }
+        if (!$user->hasPermission($perm) && !$user->isSuperAdmin()) {
+            abort(403, 'ليس لديك صلاحية للقيام بهذه العملية.');
         }
     }
 }

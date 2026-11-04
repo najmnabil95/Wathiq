@@ -192,7 +192,7 @@ export default function CategoriesPage() {
             <div
               key={cat.id}
               className={`glass card-hover-lift glow-on-hover p-5 rounded-2xl flex flex-col justify-between group animate-fade-in stagger-${(idx % 5) + 1}`}
-              style={{ border: '1px solid rgba(255,255,255,0.07)' }}
+              style={{ border: '1px solid var(--app-user-chip-border)' }}
             >
               <div>
                 <div className="flex items-start justify-between gap-3 mb-3 relative z-10">

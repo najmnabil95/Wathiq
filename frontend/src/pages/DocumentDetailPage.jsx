@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   documentsAPI,
   attachmentsAPI,
   versionsAPI,
   approvalsAPI,
   usersAPI,
+  workflowsAPI,
   auditAPI,
   settingsAPI
 } from '../services/api';
@@ -18,7 +19,9 @@ import {
   Tag, Building2, Calendar, User, MapPin, Hash, QrCode,
   Printer, AlertCircle, FileCheck, Layers, ExternalLink, Edit3,
   ZoomIn, ZoomOut, RotateCw, X, MessageSquare, GitBranch, Share2, Copy, Send, Check,
-  Sparkles, RefreshCw, Search, Stamp, Camera, ShieldCheck, Waves
+  Sparkles, RefreshCw, Search, Stamp, Camera, ShieldCheck, Waves,
+  CalendarClock, ArchiveX,
+  Plus
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DocumentScannerModal from '../components/common/DocumentScannerModal';
@@ -62,14 +65,18 @@ function BarcodeVector({ value, height = 44, width = 240, showText = true }) {
   );
 }
 
+const DOCUMENT_TABS = ['overview', 'attachments', 'versions', 'approvals', 'comments', 'label', 'report', 'audit'];
+
 export default function DocumentDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, hasPermission } = useAuthStore();
 
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview'); // overview, attachments, audit, label, report
+  const requestedTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(DOCUMENT_TABS.includes(requestedTab) ? requestedTab : 'overview');
   const [auditLogs, setAuditLogs] = useState([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
 
@@ -95,6 +102,9 @@ export default function DocumentDetailPage() {
   const [availableUsers, setAvailableUsers] = useState([]);
   const [selectedApproverId, setSelectedApproverId] = useState('');
   const [approvalNotes, setApprovalNotes] = useState('');
+  const [availableWorkflows, setAvailableWorkflows] = useState([]);
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState('');
+  const [selectedWorkflowStepId, setSelectedWorkflowStepId] = useState('');
   const [submittingApprovalRequest, setSubmittingApprovalRequest] = useState(false);
   const [stepDecisionModal, setStepDecisionModal] = useState({ open: false, approval: null, decision: 'approved', comments: '' });
   const [submittingStepDecision, setSubmittingStepDecision] = useState(false);
@@ -110,6 +120,14 @@ export default function DocumentDetailPage() {
         console.error(err);
       }
     }
+    try {
+      const params = { active_only: true };
+      if (document?.document_type_id) params.document_type_id = document.document_type_id;
+      const res = await workflowsAPI.list(params);
+      setAvailableWorkflows(res.data?.data || []);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleSubmitApprovalRequest = async (e) => {
@@ -122,12 +140,15 @@ export default function DocumentDetailPage() {
       setSubmittingApprovalRequest(true);
       await approvalsAPI.request(id, {
         approver_id: selectedApproverId,
+        workflow_step_id: selectedWorkflowStepId ? parseInt(selectedWorkflowStepId) : null,
         comments: approvalNotes || null,
       });
       toast.success('تمت إحالة الوثيقة وإشعار المعتمد بنجاح!');
       setRequestApprovalModalOpen(false);
       setSelectedApproverId('');
       setApprovalNotes('');
+      setSelectedWorkflowId('');
+      setSelectedWorkflowStepId('');
       fetchDocument();
     } catch (err) {
       toast.error(err.response?.data?.message || 'فشل إرسال طلب الاعتماد');
@@ -135,6 +156,9 @@ export default function DocumentDetailPage() {
       setSubmittingApprovalRequest(false);
     }
   };
+
+  const selectedWorkflow = availableWorkflows.find(w => String(w.id) === String(selectedWorkflowId));
+  const selectedWorkflowStep = selectedWorkflow?.steps?.find(s => String(s.id) === String(selectedWorkflowStepId));
 
   const handleOpenStepDecision = (approval, decision) => {
     setStepDecisionModal({
@@ -275,6 +299,11 @@ export default function DocumentDetailPage() {
   const [previewZoom, setPreviewZoom] = useState(1);
   const [previewRotation, setPreviewRotation] = useState(0);
 
+  // Legal Hold Modal State
+  const [legalHoldModalOpen, setLegalHoldModalOpen] = useState(false);
+  const [legalHoldReason, setLegalHoldReason] = useState('');
+  const [legalHoldSubmitting, setLegalHoldSubmitting] = useState(false);
+
   // Version Modal State
   const [versionModalOpen, setVersionModalOpen] = useState(false);
   const [versionNumber, setVersionNumber] = useState('');
@@ -284,14 +313,20 @@ export default function DocumentDetailPage() {
 
 
   useEffect(() => {
+    setAuditLogs([]);
     fetchDocument();
   }, [id]);
 
   useEffect(() => {
-    if (activeTab === 'audit' && auditLogs.length === 0) {
+    const tab = searchParams.get('tab');
+    if (DOCUMENT_TABS.includes(tab)) setActiveTab(tab);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (activeTab === 'audit') {
       fetchAuditLogs();
     }
-  }, [activeTab]);
+  }, [activeTab, id]);
 
   useEffect(() => {
     const handleAfterPrint = () => {
@@ -496,6 +531,32 @@ export default function DocumentDetailPage() {
     }
   };
 
+  const handleLegalHoldSubmit = async (e) => {
+    e.preventDefault();
+    const isHolding = !document.legal_hold;
+
+    if (isHolding && !legalHoldReason.trim()) {
+      toast.error('يرجى إدخال سبب فرض الحجز القانوني');
+      return;
+    }
+
+    try {
+      setLegalHoldSubmitting(true);
+      const res = await documentsAPI.setLegalHold(id, {
+        legal_hold: isHolding,
+        reason: legalHoldReason.trim() || undefined,
+      });
+      toast.success(res.data?.message || (isHolding ? 'تم فرض الحجز القانوني' : 'تم رفع الحجز القانوني'));
+      setLegalHoldModalOpen(false);
+      setLegalHoldReason('');
+      fetchDocument();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'فشل تحديث حالة الحجز القانوني');
+    } finally {
+      setLegalHoldSubmitting(false);
+    }
+  };
+
   const handleUploadAttachment = async (e) => {
     e.preventDefault();
     if (!uploadFile) {
@@ -564,6 +625,28 @@ export default function DocumentDetailPage() {
     }
   };
 
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذه الملاحظة؟')) return;
+    try {
+      await documentsAPI.deleteComment(id, commentId);
+      toast.success('تم حذف الملاحظة بنجاح');
+      fetchDocument();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'فشل حذف الملاحظة');
+    }
+  };
+
+  const handleRevertVersion = async (ver) => {
+    if (!window.confirm(`هل تريد استرجاع الإصدار ${ver.version_number} كإصدار جديد؟ سيتم توثيق العملية في سجل الإصدارات.`)) return;
+    try {
+      const res = await versionsAPI.revert(id, ver.id);
+      toast.success(res.data?.message || 'تم استرجاع الإصدار بنجاح');
+      fetchDocument();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'فشل استرجاع الإصدار');
+    }
+  };
+
   const handleCopyShareLink = () => {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(window.location.href);
@@ -577,7 +660,7 @@ export default function DocumentDetailPage() {
     if (!document?.attachments || document.attachments.length === 0) return;
     toast.success(`جاري تنزيل ${document.attachments.length} ملفات...`);
     for (const att of document.attachments) {
-      await handleDownloadAttachment(att.id, att.file_name || att.original_name);
+      await handleDownloadAttachment(att.id, att.original_name || att.file_name);
       await new Promise(r => setTimeout(r, 350));
     }
   };
@@ -631,7 +714,7 @@ export default function DocumentDetailPage() {
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = window.document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `${document.document_number}_${ver.version_number}_${ver.file_name || 'document.pdf'}`);
+      link.setAttribute('download', `${document.document_number}_${ver.version_number}_${ver.original_name || ver.file_name || 'document.pdf'}`);
       window.document.body.appendChild(link);
       link.click();
       link.remove();
@@ -665,6 +748,13 @@ export default function DocumentDetailPage() {
   const confName = typeof confObj === 'object'
     ? (confObj?.name || 'internal')
     : (confObj || 'internal');
+
+  // Multi-level chain awareness: only the designated approver (or a super admin)
+  // may act once approval steps exist, to avoid bypassing the workflow.
+  const pendingApprovalSteps = (document.approvals || []).filter(a => a.status === 'pending');
+  const hasPendingApprovalChain = pendingApprovalSteps.length > 0;
+  const isMyPendingApproval = pendingApprovalSteps.some(a => a.approver_id === user?.id);
+  const canDecideApproval = Boolean(user?.is_super_admin || !hasPendingApprovalChain || isMyPendingApproval);
 
   const confidentialityLabels = {
     public: 'عام (Public)',
@@ -748,7 +838,7 @@ export default function DocumentDetailPage() {
             </button>
             {statusName === 'pending_approval' && (
               <>
-                {(user?.is_super_admin || hasPermission('documents.approve')) && (
+                {canDecideApproval && (user?.is_super_admin || hasPermission('documents.approve')) && (
                   <>
                     <button
                       onClick={() => setApprovalModal({ open: true, type: 'approve' })}
@@ -767,7 +857,7 @@ export default function DocumentDetailPage() {
                     </button>
                   </>
                 )}
-                {(user?.is_super_admin || hasPermission('documents.reject')) && (
+                {canDecideApproval && (user?.is_super_admin || hasPermission('documents.reject')) && (
                   <button
                     onClick={() => setApprovalModal({ open: true, type: 'reject' })}
                     className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs sm:text-sm font-semibold transition cursor-pointer"
@@ -799,6 +889,24 @@ export default function DocumentDetailPage() {
                   استعادة
                 </button>
               )
+            )}
+
+            {(user?.is_super_admin || hasPermission('records.legal_hold')) && (
+              <button
+                onClick={() => {
+                  setLegalHoldReason('');
+                  setLegalHoldModalOpen(true);
+                }}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-medium transition cursor-pointer ${
+                  document.legal_hold
+                    ? 'bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border-rose-500/30'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                }`}
+                title={document.legal_hold ? 'رفع الحجز القانوني عن الوثيقة' : 'فرض حجز قانوني يمنع الحذف'}
+              >
+                <Shield className={`w-4 h-4 ${document.legal_hold ? 'text-rose-400' : 'text-amber-400'}`} />
+                {document.legal_hold ? 'رفع الحجز' : 'حجز قانوني'}
+              </button>
             )}
 
             {(user?.is_super_admin || hasPermission('documents.update')) && (
@@ -847,6 +955,38 @@ export default function DocumentDetailPage() {
             </button>
           </div>
         </div>
+
+        {document.legal_hold && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl border border-rose-500/40 bg-rose-950/30 backdrop-blur-md">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/30 shrink-0">
+                <Shield className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-rose-300">وثيقة خاضعة للحجز القانوني (Legal Hold)</h3>
+                <p className="text-xs text-rose-200/80 mt-0.5 leading-relaxed">
+                  {document.legal_hold_reason || 'تم فرض حجز قانوني على هذه الوثيقة.'}
+                </p>
+                <p className="text-[11px] text-rose-300/60 mt-1 font-mono" style={{ direction: 'ltr' }}>
+                  {document.legal_hold_by?.name ? `By: ${document.legal_hold_by.name} — ` : ''}
+                  {document.legal_hold_at ? new Date(document.legal_hold_at).toLocaleString('en-US') : ''}
+                </p>
+              </div>
+            </div>
+            {(user?.is_super_admin || hasPermission('records.legal_hold')) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setLegalHoldReason('');
+                  setLegalHoldModalOpen(true);
+                }}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition shrink-0 cursor-pointer"
+              >
+                رفع الحجز القانوني
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ── Navigation Tabs ───────────────────────────────────────── */}
         <div className="flex border-b border-slate-800 gap-1 sm:gap-2 overflow-x-auto no-scrollbar no-print pb-0.5">
@@ -1159,6 +1299,30 @@ export default function DocumentDetailPage() {
                 </span>
               </div>
 
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-400 flex items-center gap-2">
+                  <CalendarClock className="w-4 h-4 text-amber-400" />
+                  انتهاء الاحتفاظ
+                </span>
+                <span className="font-mono text-slate-200" style={{ direction: 'ltr' }}>
+                  {document.retention_until
+                    ? document.retention_until
+                    : document.retention_years === 99 ? 'احتفاظ دائم' : '—'}
+                </span>
+              </div>
+
+              {document.disposition_status === 'disposed' && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-400 flex items-center gap-2">
+                    <ArchiveX className="w-4 h-4 text-rose-400" />
+                    حالة الاستبعاد
+                  </span>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-rose-500/15 text-rose-300 border border-rose-500/25">
+                    مستبعدة
+                  </span>
+                </div>
+              )}
+
               {document.original_number && (
                 <div className="flex items-center justify-between text-sm pt-3 border-t border-slate-800">
                   <span className="text-slate-400 flex items-center gap-2">
@@ -1281,7 +1445,7 @@ export default function DocumentDetailPage() {
                         <FileText className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-slate-200">{att.file_name || att.original_name || 'ملف مرفق'}</p>
+                        <p className="text-sm font-semibold text-slate-200">{att.original_name || att.file_name || 'ملف مرفق'}</p>
                         <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
                           <span>{att.file_size ? `${(att.file_size / 1024).toFixed(1)} KB` : ''}</span>
                           <span>•</span>
@@ -1319,7 +1483,7 @@ export default function DocumentDetailPage() {
 
                       {(user?.is_super_admin || hasPermission('attachments.download')) && (
                         <button
-                          onClick={() => handleDownloadAttachment(att.id, att.file_name || att.original_name)}
+                          onClick={() => handleDownloadAttachment(att.id, att.original_name || att.file_name)}
                           className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
                           title="تحميل الملف"
                         >
@@ -1359,7 +1523,7 @@ export default function DocumentDetailPage() {
                 </p>
               </div>
 
-              {(user?.is_super_admin || hasPermission('documents.update') || user?.id === document.created_by) && (
+              {(user?.is_super_admin || hasPermission('workflows.submit')) && (
                 <button
                   type="button"
                   onClick={handleOpenRequestApprovalModal}
@@ -1407,11 +1571,15 @@ export default function DocumentDetailPage() {
                   const isApproved = approval.status === 'approved';
                   const isRejected = approval.status === 'rejected';
 
-                  const canDecide = isPending && (
+                  const canApproveStep = isPending && (
                     user?.is_super_admin ||
-                    user?.id === approval.approver_id ||
-                    hasPermission('documents.approve')
+                    (user?.id === approval.approver_id && hasPermission('workflows.approve'))
                   );
+                  const canRejectStep = isPending && (
+                    user?.is_super_admin ||
+                    (user?.id === approval.approver_id && hasPermission('workflows.reject'))
+                  );
+                  const canDecide = canApproveStep || canRejectStep;
 
                   return (
                     <div key={approval.id} className="relative">
@@ -1503,35 +1671,41 @@ export default function DocumentDetailPage() {
                         {/* Approver Action Buttons */}
                         {canDecide && (
                           <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800/80">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenStepDecision(approval, 'rejected')}
-                              className="px-3.5 py-1.5 rounded-xl bg-rose-600/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
-                            >
-                              <XCircle className="w-3.5 h-3.5" />
-                              رفض المرحلة
-                            </button>
+                            {canRejectStep && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenStepDecision(approval, 'rejected')}
+                                className="px-3.5 py-1.5 rounded-xl bg-rose-600/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                رفض المرحلة
+                              </button>
+                            )}
 
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDigitalSignatureModalOpen(true);
-                              }}
-                              className="px-3.5 py-1.5 rounded-xl bg-cyan-600/15 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/30 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
-                              title="اعتماد رسمي بالختم والتوقيع الإلكتروني"
-                            >
-                              <Stamp className="w-3.5 h-3.5" />
-                              ختم وتوقيع إلكتروني
-                            </button>
+                            {canApproveStep && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setDigitalSignatureModalOpen(true);
+                                  }}
+                                  className="px-3.5 py-1.5 rounded-xl bg-cyan-600/15 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/30 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                                  title="اعتماد رسمي بالختم والتوقيع الإلكتروني"
+                                >
+                                  <Stamp className="w-3.5 h-3.5" />
+                                  ختم وتوقيع إلكتروني
+                                </button>
 
-                            <button
-                              type="button"
-                              onClick={() => handleOpenStepDecision(approval, 'approved')}
-                              className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition cursor-pointer flex items-center gap-1.5"
-                            >
-                              <CheckCircle className="w-3.5 h-3.5" />
-                              اعتماد هذه المرحلة
-                            </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenStepDecision(approval, 'approved')}
+                                  className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition cursor-pointer flex items-center gap-1.5"
+                                >
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                  اعتماد هذه المرحلة
+                                </button>
+                              </>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1546,7 +1720,7 @@ export default function DocumentDetailPage() {
                 <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
                   يمكنك إحالة هذه الوثيقة إلى مدير القسم أو المعتمدين المخولين لتسجيل موافقتهم الرسمية وتوثيقها في النظام.
                 </p>
-                {(user?.is_super_admin || hasPermission('documents.update') || user?.id === document.created_by) && (
+                {(user?.is_super_admin || hasPermission('workflows.submit')) && (
                   <button
                     type="button"
                     onClick={handleOpenRequestApprovalModal}
@@ -1576,7 +1750,7 @@ export default function DocumentDetailPage() {
                 </p>
               </div>
 
-              {(user?.is_super_admin || hasPermission('documents.update')) && (
+              {(user?.is_super_admin || hasPermission('versions.create')) && (
                 <button
                   type="button"
                   onClick={handleOpenNewVersionModal}
@@ -1618,7 +1792,7 @@ export default function DocumentDetailPage() {
                               </span>
                             )}
                             <span className="text-sm font-bold text-white">
-                              {ver.file_name ? ver.file_name : 'تحديث بيانات إدارية'}
+                              {ver.original_name || ver.file_name || 'تحديث بيانات إدارية'}
                             </span>
                           </div>
 
@@ -1649,16 +1823,28 @@ export default function DocumentDetailPage() {
                             )}
                           </div>
 
-                          {ver.file_path && (
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadVersion(ver)}
-                              className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                              تحميل هذا الإصدار
-                            </button>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {!isLatest && (user?.is_super_admin || hasPermission('versions.revert')) && (
+                              <button
+                                type="button"
+                                onClick={() => handleRevertVersion(ver)}
+                                className="px-3.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                استرجاع هذا الإصدار
+                              </button>
+                            )}
+                            {ver.file_path && (
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadVersion(ver)}
+                                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                تحميل هذا الإصدار
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1672,7 +1858,7 @@ export default function DocumentDetailPage() {
                 <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
                   هذه الوثيقة ما زالت تعمل بإصدارها الأصلي المعتمد الأول. يمكنك إنشاء إصدار جديد لتوثيق أي تحديثات أو مراجعات لاحقة.
                 </p>
-                {(user?.is_super_admin || hasPermission('documents.update')) && (
+                {(user?.is_super_admin || hasPermission('versions.create')) && (
                   <button
                     type="button"
                     onClick={handleOpenNewVersionModal}
@@ -1745,15 +1931,27 @@ export default function DocumentDetailPage() {
                           <span className="text-sm font-bold text-white">{comm.user?.name || 'مستخدم النظام'}</span>
                           <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">ملاحظة داخلية</span>
                         </div>
-                        <span className="text-xs text-slate-400 font-mono" style={{ direction: 'ltr' }}>
-                          {comm.created_at ? new Date(comm.created_at).toLocaleString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          }) : ''}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-400 font-mono" style={{ direction: 'ltr' }}>
+                            {comm.created_at ? new Date(comm.created_at).toLocaleString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            }) : ''}
+                          </span>
+                          {(user?.is_super_admin || hasPermission('comments.delete')) && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteComment(comm.id)}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-600/30 text-slate-400 hover:text-rose-300 border border-slate-700/60 transition cursor-pointer"
+                              title="حذف الملاحظة"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <p className="text-xs sm:text-sm text-slate-300 leading-relaxed whitespace-pre-line bg-slate-950/40 p-3 rounded-xl border border-slate-800/60">
                         {comm.comment}
@@ -2335,6 +2533,66 @@ export default function DocumentDetailPage() {
                 <p className="text-[11px] text-slate-500 mt-1">سيتم إرسال إشعار فوري وتنبيه للمستخدم المختار للمراجعة واتخاذ القرار.</p>
               </div>
 
+              {availableWorkflows.length > 0 && (
+                <div className="space-y-3 p-3.5 rounded-xl bg-violet-500/5 border border-violet-500/20">
+                  <div className="flex items-center gap-2">
+                    <GitBranch className="w-3.5 h-3.5 text-violet-400" />
+                    <span className="text-xs font-semibold text-slate-300">ربط الطلب بقالب سير عمل (اختياري)</span>
+                  </div>
+
+                  <select
+                    value={selectedWorkflowId}
+                    onChange={(e) => {
+                      setSelectedWorkflowId(e.target.value);
+                      setSelectedWorkflowStepId('');
+                    }}
+                    className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-violet-500"
+                  >
+                    <option value="">بدون قالب (اعتماد مباشر)</option>
+                    {availableWorkflows.map((w) => (
+                      <option key={w.id} value={w.id}>{w.name_ar || w.name}</option>
+                    ))}
+                  </select>
+
+                  {selectedWorkflow && (
+                    <select
+                      value={selectedWorkflowStepId}
+                      onChange={(e) => setSelectedWorkflowStepId(e.target.value)}
+                      className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-violet-500"
+                    >
+                      <option value="">-- اختر المرحلة من القالب --</option>
+                      {(selectedWorkflow.steps || []).map((step) => (
+                        <option key={step.id} value={step.id}>
+                          {step.step_order}. {step.name_ar || step.name}
+                          {step.role?.display_name_ar ? ` — ${step.role.display_name_ar}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  {selectedWorkflowStep && (
+                    <div className="text-[11px] text-slate-400 space-y-1 leading-relaxed">
+                      <p>
+                        نوع الإجراء:{' '}
+                        <strong className="text-violet-300">
+                          {selectedWorkflowStep.action_type === 'review'
+                            ? 'مراجعة'
+                            : selectedWorkflowStep.action_type === 'acknowledge'
+                              ? 'إطلاع'
+                              : 'اعتماد'}
+                        </strong>
+                        {selectedWorkflowStep.role?.display_name_ar && (
+                          <> — الدور المسؤول: <strong className="text-violet-300">{selectedWorkflowStep.role.display_name_ar}</strong></>
+                        )}
+                      </p>
+                      {selectedWorkflowStep.instructions && (
+                        <p className="text-slate-500">تعليمات المرحلة: {selectedWorkflowStep.instructions}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                   ملاحظات أو توجيهات الإحالة (اختياري)
@@ -2571,7 +2829,7 @@ export default function DocumentDetailPage() {
                 {activePreviewAttachment && (
                   <button
                     type="button"
-                    onClick={() => handleDownloadAttachment(activePreviewAttachment.id, activePreviewAttachment.file_name || activePreviewAttachment.original_name)}
+                    onClick={() => handleDownloadAttachment(activePreviewAttachment.id, activePreviewAttachment.original_name || activePreviewAttachment.file_name)}
                     className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition"
                     title="تحميل الملف"
                   >
@@ -2629,7 +2887,7 @@ export default function DocumentDetailPage() {
                     {activePreviewAttachment && (
                       <button
                         type="button"
-                        onClick={() => handleDownloadAttachment(activePreviewAttachment.id, activePreviewAttachment.file_name || activePreviewAttachment.original_name)}
+                        onClick={() => handleDownloadAttachment(activePreviewAttachment.id, activePreviewAttachment.original_name || activePreviewAttachment.file_name)}
                         className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold inline-flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 cursor-pointer"
                       >
                         <Download className="w-4 h-4" />
@@ -3073,6 +3331,98 @@ export default function DocumentDetailPage() {
         </div>,
         window.document.body
       )}
+      {/* ── Legal Hold Modal ── */}
+      {legalHoldModalOpen && typeof window !== 'undefined' && window.document?.body && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md"
+          style={{ direction: 'rtl', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
+          onClick={() => !legalHoldSubmitting && setLegalHoldModalOpen(false)}
+        >
+          <div
+            className="bg-[#0c1427] border border-slate-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden my-auto text-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-2 rounded-xl ${document.legal_hold ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                  <Shield className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    {document.legal_hold ? 'رفع الحجز القانوني' : 'فرض حجز قانوني'}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">{document.document_number}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLegalHoldModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleLegalHoldSubmit} className="p-6 space-y-4">
+              <div className={`p-3 rounded-xl border text-[11px] leading-relaxed ${
+                document.legal_hold
+                  ? 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+                  : 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+              }`}>
+                {document.legal_hold
+                  ? 'رفع الحجز يعيد إمكانية حذف الوثيقة وفق سياسات الاستبقاء المعتمدة.'
+                  : 'الحجز القانوني يمنع حذف الوثيقة (المبدئي والنهائي) حتى يتم رفعه رسمياً.'}
+              </div>
+
+              {!document.legal_hold && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    سبب الحجز القانوني <span className="text-rose-400">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={legalHoldReason}
+                    onChange={(e) => setLegalHoldReason(e.target.value)}
+                    placeholder="مثال: قضية مرجعية رقم ...، تحقيق داخلي، طلب من الجهة القانونية..."
+                    className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-rose-500 resize-none"
+                  />
+                </div>
+              )}
+
+              {document.legal_hold && (
+                <div className="p-3 rounded-xl bg-slate-950/50 border border-slate-800 text-xs text-slate-300">
+                  <div className="text-slate-400 mb-1">سبب الحجز الحالي:</div>
+                  {document.legal_hold_reason || '—'}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setLegalHoldModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={legalHoldSubmitting}
+                  className={`px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition shadow-lg disabled:opacity-50 cursor-pointer ${
+                    document.legal_hold
+                      ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/20'
+                      : 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/20'
+                  }`}
+                >
+                  {legalHoldSubmitting ? 'جاري التنفيذ...' : document.legal_hold ? 'تأكيد رفع الحجز' : 'فرض الحجز'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        window.document.body
+      )}
+
       {/* ── Document Camera Scanner Modal ── */}
       <DocumentScannerModal
         isOpen={scannerModalOpen}

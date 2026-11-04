@@ -13,6 +13,7 @@ class DocumentVersion extends Model
         'document_id',
         'version_number',
         'file_name',
+        'original_name',
         'file_path',
         'disk',
         'file_size',

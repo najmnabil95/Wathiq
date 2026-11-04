@@ -166,7 +166,7 @@ class UserController extends Controller
 
     public function updateRoles(Request $request, int $id): JsonResponse
     {
-        $this->checkPermission('roles.manage');
+        $this->checkAnyPermission(['roles.assign', 'roles.manage']);
 
         $user = User::findOrFail($id);
 
@@ -189,6 +189,79 @@ class UserController extends Controller
         $this->auditService->log('update', $user, null, ['roles' => $validated['roles']], "Roles updated for: {$user->name}");
 
         return response()->json(['success' => true, 'data' => $user->load('roles'), 'message' => 'تم تحديث الأدوار.']);
+    }
+
+    public function changeStatus(Request $request, int $id): JsonResponse
+    {
+        $this->checkPermission('users.change_status');
+
+        $user = User::findOrFail($id);
+
+        if ($request->user()->id === $user->id) {
+            return response()->json(['success' => false, 'message' => 'لا يمكنك تغيير حالة حسابك الشخصي الحالي.'], 422);
+        }
+
+        if ($user->isSuperAdmin() && !$request->user()->isSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'لا يمكن تعديل حالة حساب مدير النظام الكامل.'], 422);
+        }
+
+        $validated = $request->validate([
+            'status' => ['required', 'in:active,inactive,suspended'],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $old = ['status' => $user->status];
+        $user->update(['status' => $validated['status']]);
+
+        if ($validated['status'] !== 'active') {
+            $user->tokens()->delete();
+        }
+
+        $labels = ['active' => 'نشط', 'inactive' => 'معطل', 'suspended' => 'موقوف'];
+        $this->auditService->log(
+            'update_status',
+            $user,
+            $old,
+            ['status' => $user->status, 'reason' => $validated['reason'] ?? null],
+            "User status changed to {$labels[$user->status]}: {$user->name}"
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم تحديث حالة الحساب بنجاح.',
+            'data'    => $user->load('roles'),
+        ]);
+    }
+
+    public function resetPassword(Request $request, int $id): JsonResponse
+    {
+        $this->checkPermission('users.reset_password');
+
+        $user = User::findOrFail($id);
+
+        if ($user->isSuperAdmin() && !$request->user()->isSuperAdmin()) {
+            return response()->json(['success' => false, 'message' => 'لا يمكن إعادة تعيين كلمة مرور مدير النظام الكامل.'], 422);
+        }
+
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user->update(['password' => Hash::make($validated['password'])]);
+        $user->tokens()->delete();
+
+        $this->auditService->log(
+            'password.reset',
+            $user,
+            null,
+            ['revoked_sessions' => true],
+            "Password reset for user: {$user->name}"
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم إعادة تعيين كلمة المرور وإنهاء جلسات المستخدم بنجاح.',
+        ]);
     }
 
     public function destroy(Request $request, int $id): JsonResponse
@@ -222,5 +295,22 @@ class UserController extends Controller
         if (!$user->hasPermission($perm) && !$user->isSuperAdmin()) {
             abort(403);
         }
+    }
+
+    private function checkAnyPermission(array $permissions): void
+    {
+        $user = request()->user();
+        if (!$user) {
+            abort(401, 'غير مصرح.');
+        }
+        if ($user->isSuperAdmin()) {
+            return;
+        }
+        foreach ($permissions as $permission) {
+            if ($user->hasPermission($permission)) {
+                return;
+            }
+        }
+        abort(403, 'ليس لديك صلاحية لتعيين الأدوار.');
     }
 }

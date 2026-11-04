@@ -7,6 +7,7 @@ use App\Models\Document;
 use App\Models\DocumentAttachment;
 use App\Services\AttachmentService;
 use App\Services\AuditService;
+use App\Services\WatermarkService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -16,13 +17,14 @@ class AttachmentController extends Controller
     public function __construct(
         private readonly AttachmentService $attachmentService,
         private readonly AuditService      $auditService,
+        private readonly WatermarkService  $watermarkService,
     ) {}
 
-    public function index(int $id): JsonResponse
+    public function index(Request $request, int $id): JsonResponse
     {
-        $this->checkPermission('documents.view');
+        $this->checkPermission('attachments.view');
 
-        $document    = Document::findOrFail($id);
+        $document    = Document::findVisibleOrFail($id, $request->user());
         $attachments = $document->attachments()->with('uploader')->get();
 
         return response()->json(['success' => true, 'data' => $attachments]);
@@ -32,7 +34,7 @@ class AttachmentController extends Controller
     {
         $this->checkPermission('attachments.upload');
 
-        $document = Document::findOrFail($id);
+        $document = Document::findVisibleOrFail($id, $request->user());
 
         if ($request->hasFile('file') && !$request->hasFile('files')) {
             $request->validate([
@@ -89,7 +91,7 @@ class AttachmentController extends Controller
     {
         $this->checkPermission('attachments.download');
 
-        $document   = Document::findOrFail($docId);
+        $document   = Document::findVisibleOrFail($docId, $request->user());
         $attachment = DocumentAttachment::where('document_id', $docId)->findOrFail($attId);
 
         $diskName = $attachment->disk ?: 'local';
@@ -118,14 +120,28 @@ class AttachmentController extends Controller
 
         $safeAscii = preg_replace('/[^\x20-\x7E]/', '_', $attachment->original_name ?: 'download');
         $encodedName = rawurlencode($attachment->original_name ?: 'download');
+        $headers = [
+            'Content-Disposition' => "attachment; filename=\"{$safeAscii}\"; filename*=UTF-8''{$encodedName}",
+        ];
 
-        return $disk->download(
-            $filePath,
-            $safeAscii,
-            [
-                'Content-Disposition' => "attachment; filename=\"{$safeAscii}\"; filename*=UTF-8''{$encodedName}",
-            ]
-        );
+        if (WatermarkService::enabled() && method_exists($disk, 'path')) {
+            try {
+                $watermarked = $this->watermarkService->apply(
+                    $disk->path($filePath),
+                    $attachment->mime_type,
+                    $document,
+                    $request->user()
+                );
+            } catch (\Throwable) {
+                $watermarked = null;
+            }
+
+            if ($watermarked) {
+                return response()->download($watermarked, $safeAscii, $headers)->deleteFileAfterSend(true);
+            }
+        }
+
+        return $disk->download($filePath, $safeAscii, $headers);
     }
 
 
@@ -134,8 +150,9 @@ class AttachmentController extends Controller
      */
     public function preview(Request $request, int $docId, int $attId): mixed
     {
-        $this->checkPermission('documents.view');
+        $this->checkPermission('attachments.view');
 
+        Document::findVisibleOrFail($docId, $request->user());
         $attachment = DocumentAttachment::where('document_id', $docId)->findOrFail($attId);
 
         $diskName = $attachment->disk ?: 'local';
@@ -177,7 +194,7 @@ class AttachmentController extends Controller
     {
         $this->checkPermission('attachments.delete');
 
-        $document   = Document::findOrFail($docId);
+        $document   = Document::findVisibleOrFail($docId, $request->user());
         $attachment = DocumentAttachment::where('document_id', $docId)->findOrFail($attId);
 
         $this->auditService->log('delete', $document, ['file' => $attachment->original_name], null);
@@ -192,8 +209,9 @@ class AttachmentController extends Controller
      */
     public function getOcr(Request $request, int $docId, int $attId): JsonResponse
     {
-        $this->checkPermission('documents.view');
+        $this->checkPermission('attachments.view');
 
+        Document::findVisibleOrFail($docId, $request->user());
         $attachment = DocumentAttachment::where('document_id', $docId)->findOrFail($attId);
 
         return response()->json([
@@ -218,7 +236,7 @@ class AttachmentController extends Controller
     {
         $this->checkPermission('attachments.upload');
 
-        $document   = Document::findOrFail($docId);
+        $document   = Document::findVisibleOrFail($docId, $request->user());
         $attachment = DocumentAttachment::where('document_id', $docId)->findOrFail($attId);
 
         if ($request->filled('ocr_text')) {

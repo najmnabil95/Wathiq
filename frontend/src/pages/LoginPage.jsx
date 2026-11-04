@@ -37,10 +37,13 @@ export default function LoginPage() {
     }
   };
 
+  const isLight = typeof document !== 'undefined' && document.documentElement.classList.contains('light-theme');
+
   const demoUsers = [
-    { label: 'مدير النظام',    email: 'admin@edms.local',   password: 'ChangeMe@123', color: '#60a5fa', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.25)' },
-    { label: 'مدير تقنية المعلومات', email: 'manager@edms.local', password: 'Demo@123456', color: '#c4b5fd', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.25)' },
-    { label: 'موظف الأرشيف',  email: 'staff@edms.local',   password: 'Demo@123456', color: '#6ee7b7', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' },
+    { label: 'مدير النظام',    email: 'admin@edms.local',   password: 'ChangeMe@123', color: isLight ? '#1d4ed8' : '#60a5fa', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.25)' },
+    { label: 'مدير تقنية المعلومات', email: 'manager@edms.local', password: 'Demo@123456', color: isLight ? '#6d28d9' : '#c4b5fd', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.25)' },
+    { label: 'موظف الأرشيف',  email: 'staff@edms.local',   password: 'Demo@123456', color: isLight ? '#047857' : '#6ee7b7', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' },
+    { label: 'معتمد الوثائق',  email: 'approver@edms.local', password: 'Demo@123456', color: isLight ? '#b45309' : '#fcd34d', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)' },
   ];
 
   return (
@@ -56,7 +59,7 @@ export default function LoginPage() {
              style={{ background: 'linear-gradient(90deg, transparent, rgba(59,130,246,0.4), transparent)' }} />
         {/* Grid pattern */}
         <div className="absolute inset-0 opacity-[0.018]"
-             style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+             style={{ backgroundImage: 'linear-gradient(var(--app-grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--app-grid-line) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
       </div>
 
       {/* Login Card */}
@@ -75,7 +78,7 @@ export default function LoginPage() {
             <Shield size={27} className="text-blue-400" />
           </div>
           <h1 className="text-[22px] font-black text-white mb-1 tracking-tight">وثيق IT-EDMS</h1>
-          <p className="text-[13px]" style={{ color: '#45607a' }}>
+          <p className="text-[13px]" style={{ color: 'var(--app-logo-sub)' }}>
             نظام إدارة وأرشفة الوثائق الإلكترونية
           </p>
         </div>
@@ -83,11 +86,11 @@ export default function LoginPage() {
         {/* Card */}
         <div
           className="glass p-6 sm:p-8"
-          style={{ boxShadow: '0 24px 80px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06)' }}
+          style={{ boxShadow: 'var(--app-menu-shadow)' }}
         >
           <div className="flex items-center gap-2 mb-6">
             <Fingerprint size={18} className="text-blue-400" />
-            <h2 className="text-base font-bold" style={{ color: '#d4e0f5' }}>تسجيل الدخول</h2>
+            <h2 className="text-base font-bold" style={{ color: 'var(--app-heading)' }}>تسجيل الدخول</h2>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -111,7 +114,7 @@ export default function LoginPage() {
                   dir="ltr"
                   style={{ paddingLeft: '40px' }}
                 />
-                <Mail size={15} className="absolute top-1/2 left-3 -translate-y-1/2 pointer-events-none" style={{ color: '#3d5070' }} />
+                <Mail size={15} className="absolute top-1/2 left-3 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--app-input-icon)' }} />
               </div>
               {errors.email && (
                 <p className="form-error">
@@ -138,12 +141,12 @@ export default function LoginPage() {
                   dir="ltr"
                   style={{ paddingRight: '40px', paddingLeft: '40px' }}
                 />
-                <Lock size={15} className="absolute top-1/2 right-3 -translate-y-1/2 pointer-events-none" style={{ color: '#3d5070' }} />
+                <Lock size={15} className="absolute top-1/2 right-3 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--app-input-icon)' }} />
                 <button
                   type="button"
                   onClick={() => setShowPassword(v => !v)}
                   className="absolute top-1/2 left-3 -translate-y-1/2 p-0.5 rounded transition-colors hover:text-blue-400"
-                  style={{ color: '#526080', background: 'none', border: 'none', cursor: 'pointer' }}
+                  style={{ color: 'var(--app-input-icon)', background: 'none', border: 'none', cursor: 'pointer' }}
                   tabIndex={-1}
                   title={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
                 >
@@ -170,7 +173,7 @@ export default function LoginPage() {
                 />
                 <div
                   className="w-10 h-5 rounded-full transition-all duration-200"
-                  style={{ background: form.remember_me ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255,255,255,0.08)', boxShadow: form.remember_me ? '0 0 12px rgba(59,130,246,0.3)' : 'none' }}
+                  style={{ background: form.remember_me ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'var(--app-switch-off)', boxShadow: form.remember_me ? '0 0 12px rgba(59,130,246,0.3)' : 'none' }}
                 >
                   <div
                     className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200"
@@ -178,7 +181,7 @@ export default function LoginPage() {
                   />
                 </div>
               </div>
-              <span className="text-sm" style={{ color: '#7a90a8' }}>تذكرني</span>
+              <span className="text-sm" style={{ color: 'var(--app-heading-muted)' }}>تذكرني</span>
             </label>
 
             {/* Submit */}
@@ -204,11 +207,11 @@ export default function LoginPage() {
           </form>
 
           {/* Quick Demo Logins */}
-          <div className="mt-5 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            <p className="text-[11px] text-center font-semibold mb-2.5" style={{ color: '#364a60' }}>
+          <div className="mt-5 pt-4" style={{ borderTop: '1px solid var(--app-user-chip-border)' }}>
+            <p className="text-[11px] text-center font-semibold mb-2.5" style={{ color: 'var(--app-footer-text)' }}>
               — دخول تجريبي سريع —
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {demoUsers.map((u, i) => (
                 <button
                   key={i}
@@ -225,13 +228,13 @@ export default function LoginPage() {
           </div>
 
           {/* Footer */}
-          <p className="text-center text-[11px] mt-4 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', color: '#2d4060' }}>
+          <p className="text-center text-[11px] mt-4 pt-3" style={{ borderTop: '1px solid var(--app-user-chip-border)', color: 'var(--app-footer-muted)' }}>
             🔒 نظام آمن · جميع العمليات مسجلة ومراقبة
           </p>
         </div>
 
         {/* Version */}
-        <p className="text-center text-[11px] mt-4" style={{ color: '#385072' }}>
+        <p className="text-center text-[11px] mt-4" style={{ color: 'var(--app-footer-text)' }}>
           IT-EDMS v2.4 Enterprise &mdash; قسم تقنية المعلومات والأنظمة
         </p>
       </div>

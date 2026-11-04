@@ -70,5 +70,24 @@ class AdminUserSeeder extends Seeder
         if ($staffRole && !$staff->hasRole('it_staff')) {
             $staff->roles()->attach($staffRole->id);
         }
+
+        // Document Approver demo user
+        $approver = User::firstOrCreate(
+            ['email' => 'approver@edms.local'],
+            [
+                'name'            => 'معتمد الوثائق ورئيس جهة العمل',
+                'username'        => 'approver',
+                'email'           => 'approver@edms.local',
+                'employee_number' => 'EMP-004',
+                'department_id'   => $itDept?->id,
+                'password'        => Hash::make(env('DEMO_PASSWORD', 'Demo@123456')),
+                'status'          => 'active',
+            ]
+        );
+
+        $approverRole = Role::where('name', 'approver')->first();
+        if ($approverRole && !$approver->hasRole('approver')) {
+            $approver->roles()->attach($approverRole->id);
+        }
     }
 }

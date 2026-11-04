@@ -76,6 +76,9 @@ class DocumentBatchAndVersionTest extends TestCase
         $data = $response->json('data');
         $this->assertEquals('2.0', $data['version_number']);
         $this->assertNotEmpty($data['file_name']);
+        $this->assertEquals('contract_v2.pdf', $data['original_name']);
+        $this->assertNotEquals('contract_v2.pdf', $data['file_name']);
+        $this->assertSame('contract_v2.pdf', DocumentVersion::find($data['id'])->original_name);
 
         // Check versions listing
         $listResponse = $this->actingAs($admin, 'sanctum')

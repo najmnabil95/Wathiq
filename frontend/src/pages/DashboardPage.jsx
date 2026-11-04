@@ -511,7 +511,7 @@ function QuickTile({ label, value, icon: Icon, color, to }) {
       onClick={() => navigate(to)}
       className="glass card-hover-lift glow-on-hover press-effect text-right p-3 sm:p-4 rounded-xl sm:rounded-2xl w-full group relative overflow-hidden"
       style={{
-        border: '1px solid rgba(255,255,255,0.07)',
+        border: '1px solid var(--app-user-chip-border)',
         outline: 'none',
         cursor: 'pointer',
       }}

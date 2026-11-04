@@ -17,6 +17,7 @@ class DocumentTypeController extends Controller
     public function index(Request $request): JsonResponse
     {
         $types = DocumentType::with('category')
+            ->withCount(['fields', 'documents'])
             ->when($request->input('category_id'), fn($q, $v) => $q->byCategory((int)$v))
             ->when($request->boolean('active_only'), fn($q) => $q->active())
             ->get();
@@ -94,10 +95,10 @@ class DocumentTypeController extends Controller
 
     // ─── Dynamic Fields ─────────────────────────────────────────────
 
-    public function fields(int $id): JsonResponse
+    public function fields(Request $request, int $id): JsonResponse
     {
         $type   = DocumentType::findOrFail($id);
-        $fields = $type->activeFields;
+        $fields = $request->boolean('all') ? $type->fields : $type->activeFields;
         return response()->json(['success' => true, 'data' => $fields]);
     }
 

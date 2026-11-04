@@ -5,6 +5,11 @@ import { Toaster } from 'react-hot-toast';
 import App from './App.jsx';
 import './index.css';
 
+// Apply the saved theme before first paint so the login page matches too.
+if (localStorage.getItem('edms_theme') === 'light') {
+  document.documentElement.classList.add('light-theme');
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
@@ -14,9 +19,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         toastOptions={{
           duration: 4000,
           style: {
-            background: '#0d1424',
-            color: '#f0f4ff',
-            border: '1px solid rgba(255,255,255,0.1)',
+            background: 'var(--app-menu-bg)',
+            color: 'var(--app-heading)',
+            border: '1px solid var(--app-user-chip-border)',
             borderRadius: '12px',
             fontSize: '0.875rem',
             fontFamily: 'Cairo, sans-serif',
@@ -24,10 +29,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             direction: 'rtl',
           },
           success: {
-            iconTheme: { primary: '#10b981', secondary: '#0d1424' },
+            iconTheme: { primary: '#10b981', secondary: 'var(--app-menu-bg)' },
           },
           error: {
-            iconTheme: { primary: '#ef4444', secondary: '#0d1424' },
+            iconTheme: { primary: '#ef4444', secondary: 'var(--app-menu-bg)' },
           },
         }}
       />

@@ -11,12 +11,17 @@ const DocumentsPage      = lazy(() => import('./pages/DocumentsPage'));
 const DocumentDetailPage = lazy(() => import('./pages/DocumentDetailPage'));
 const CreateDocumentPage = lazy(() => import('./pages/CreateDocumentPage'));
 const CategoriesPage     = lazy(() => import('./pages/CategoriesPage'));
+const DocumentTypesPage  = lazy(() => import('./pages/DocumentTypesPage'));
 const DepartmentsPage    = lazy(() => import('./pages/DepartmentsPage'));
+const OrganizationsPage  = lazy(() => import('./pages/OrganizationsPage'));
 const UsersPage          = lazy(() => import('./pages/UsersPage'));
 const RolesPage          = lazy(() => import('./pages/RolesPage'));
 const AuditPage          = lazy(() => import('./pages/AuditPage'));
 const SettingsPage       = lazy(() => import('./pages/SettingsPage'));
 const ProfilePage        = lazy(() => import('./pages/ProfilePage'));
+const WorkflowsPage      = lazy(() => import('./pages/WorkflowsPage'));
+const DispositionPage    = lazy(() => import('./pages/DispositionPage'));
+const SystemFlowPage     = lazy(() => import('./pages/SystemFlowPage'));
 
 // ── Loading Fallback ─────────────────────────────────────────────
 function PageLoader() {
@@ -97,14 +102,29 @@ export default function App() {
               <DocumentDetailPage />
             </RequirePermission>
           } />
+          <Route path="disposition" element={
+            <RequirePermission permission="disposition.manage">
+              <DispositionPage />
+            </RequirePermission>
+          } />
           <Route path="categories" element={
             <RequirePermission permission="categories.view">
               <CategoriesPage />
             </RequirePermission>
           } />
+          <Route path="document-types" element={
+            <RequirePermission any={['document-types.view', 'document-types.manage']}>
+              <DocumentTypesPage />
+            </RequirePermission>
+          } />
           <Route path="departments" element={
             <RequirePermission permission="departments.view">
               <DepartmentsPage />
+            </RequirePermission>
+          } />
+          <Route path="organizations" element={
+            <RequirePermission permission="organizations.view">
+              <OrganizationsPage />
             </RequirePermission>
           } />
           <Route path="users" element={
@@ -122,12 +142,18 @@ export default function App() {
               <AuditPage />
             </RequirePermission>
           } />
+          <Route path="workflows" element={
+            <RequirePermission any={['workflows.view', 'workflows.manage']}>
+              <WorkflowsPage />
+            </RequirePermission>
+          } />
           <Route path="settings" element={
             <RequirePermission permission="settings.view">
               <SettingsPage />
             </RequirePermission>
           } />
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="system-flow" element={<SystemFlowPage />} />
         </Route>
 
         {/* Catch all */}

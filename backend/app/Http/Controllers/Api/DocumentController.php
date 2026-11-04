@@ -3,13 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Comment;
 use App\Models\Document;
 use App\Models\DocumentFieldValue;
 use App\Models\DocumentType;
+use App\Models\Setting;
 use App\Models\Status;
 use App\Services\AuditService;
 use App\Services\DocumentNumberService;
 use App\Services\NotificationService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -36,10 +39,8 @@ class DocumentController extends Controller
             'creator', 'assignee', 'status', 'confidentialityLevel', 'tags',
         ]);
 
-        // Non-admin users see only their dept's docs
-        if (!$user->isSuperAdmin() && !$user->hasRole('it_manager')) {
-            $query->where('department_id', $user->department_id);
-        }
+        // Department scope + confidentiality clearance are enforced centrally
+        $query->visibleTo($user);
 
         // Apply filters
         $query
@@ -115,6 +116,7 @@ class DocumentController extends Controller
             'assignee',
             'status',
             'confidentialityLevel',
+            'legalHoldBy:id,name',
             'fieldValues.field',
             'attachments.uploader',
             'versions.uploader',
@@ -123,7 +125,7 @@ class DocumentController extends Controller
             'comments.user',
             'comments.replies.user',
             'tags',
-        ])->findOrFail($id);
+        ])->visibleTo($request->user())->findOrFail($id);
 
         // Audit: log view
         $this->auditService->logView($document);
@@ -158,6 +160,8 @@ class DocumentController extends Controller
             'fields.*'                 => ['nullable'],
         ]);
 
+        $this->ensureCanAssignConfidentiality($request, (int) $validated['confidentiality_level_id']);
+
         $document = DB::transaction(function () use ($validated, $request) {
             $documentType = DocumentType::findOrFail($validated['document_type_id']);
 
@@ -168,6 +172,8 @@ class DocumentController extends Controller
             if (empty($validated['status_id'])) {
                 $validated['status_id'] = Status::getDefault()?->id;
             }
+
+            $retentionYears = (int) Setting::get('retention_years', 7);
 
             $document = Document::create([
                 'document_number'          => $documentNumber,
@@ -186,6 +192,10 @@ class DocumentController extends Controller
                 'description'              => $validated['description'] ?? null,
                 'notes'                    => $validated['notes'] ?? null,
                 'physical_location'        => $validated['physical_location'] ?? null,
+                'retention_years'          => $retentionYears,
+                'retention_until'          => $retentionYears >= 99
+                    ? null
+                    : Carbon::parse($validated['document_date'])->addYears($retentionYears)->toDateString(),
             ]);
 
             // Store dynamic field values
@@ -216,7 +226,7 @@ class DocumentController extends Controller
     {
         $this->checkPermission('documents.update');
 
-        $document = Document::findOrFail($id);
+        $document = Document::findVisibleOrFail($id, $request->user());
 
         $validated = $request->validate([
             'title'                    => ['sometimes', 'string', 'max:255'],
@@ -234,6 +244,23 @@ class DocumentController extends Controller
             'tags'                     => ['nullable', 'array'],
             'fields'                   => ['nullable', 'array'],
         ]);
+
+        if (array_key_exists('document_date', $validated)) {
+            $years = $document->retention_years ?? (int) Setting::get('retention_years', 7);
+            $validated['retention_years'] = $years;
+            $validated['retention_until'] = $years >= 99
+                ? null
+                : Carbon::parse($validated['document_date'])->addYears($years)->toDateString();
+        }
+
+        $newLevelId = array_key_exists('confidentiality_level_id', $validated)
+            ? (int) $validated['confidentiality_level_id']
+            : null;
+
+        if ($newLevelId !== null && $newLevelId !== (int) $document->confidentiality_level_id
+            && ($document->isConfidential() || Document::requiresConfidentialityClearanceFor($newLevelId))) {
+            $this->ensureCanAssignConfidentiality($request, $newLevelId);
+        }
 
         DB::transaction(function () use ($document, $validated) {
             [$old, $new] = $this->auditService->getDiff($document->fill($validated));
@@ -263,12 +290,134 @@ class DocumentController extends Controller
     {
         $this->checkPermission('documents.delete');
 
-        $document = Document::findOrFail($id);
+        $document = Document::findVisibleOrFail($id, $request->user());
+
+        if ($document->hasActiveLegalHold()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'لا يمكن حذف وثيقة خاضعة للحجز القانوني (Legal Hold). يجب رفع الحجز أولاً.',
+            ], 422);
+        }
 
         $this->auditService->log('delete', $document, $document->toArray(), null, "Document soft-deleted: {$document->document_number}");
         $document->delete();
 
         return response()->json(['success' => true, 'message' => 'تم حذف الوثيقة.']);
+    }
+
+    // ─── Legal Hold (Records Retention) ───────────────────────────
+
+    public function legalHold(Request $request, int $id): JsonResponse
+    {
+        $this->checkPermission('records.legal_hold');
+
+        $document = Document::findVisibleOrFail($id, $request->user(), withTrashed: true);
+
+        $validated = $request->validate([
+            'legal_hold' => ['required', 'boolean'],
+            'reason'     => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $holding = (bool) $validated['legal_hold'];
+        $reason  = trim((string) ($validated['reason'] ?? ''));
+
+        if ($holding && $reason === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'يرجى إدخال سبب فرض الحجز القانوني.',
+            ], 422);
+        }
+
+        if (!$holding && !$document->hasActiveLegalHold()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'الوثيقة غير خاضعة لحجز قانوني حالياً.',
+            ], 422);
+        }
+
+        $old = [
+            'legal_hold'        => $document->legal_hold,
+            'legal_hold_reason' => $document->legal_hold_reason,
+        ];
+
+        if ($holding) {
+            $document->update([
+                'legal_hold'             => true,
+                'legal_hold_reason'      => $reason,
+                'legal_hold_at'          => now(),
+                'legal_hold_by'          => $request->user()->id,
+                'legal_hold_released_at' => null,
+            ]);
+            $action  = 'legal_hold.place';
+            $message = 'تم فرض الحجز القانوني على الوثيقة ومنع حذفها.';
+        } else {
+            $document->update([
+                'legal_hold'             => false,
+                'legal_hold_released_at' => now(),
+            ]);
+            $action  = 'legal_hold.release';
+            $message = 'تم رفع الحجز القانوني عن الوثيقة.';
+        }
+
+        $this->auditService->log(
+            $action,
+            $document,
+            $old,
+            [
+                'legal_hold'        => $document->legal_hold,
+                'legal_hold_reason' => $document->legal_hold_reason,
+                'legal_hold_by'     => $document->legal_hold_by,
+            ],
+            $holding
+                ? "Legal hold placed on document {$document->document_number}: {$reason}"
+                : "Legal hold released for document {$document->document_number}"
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'data'    => $document->fresh(['legalHoldBy:id,name']),
+        ]);
+    }
+
+    // ─── Force Delete (Purge) ─────────────────────────────────────
+
+    public function forceDelete(Request $request, int $id): JsonResponse
+    {
+        $this->checkPermission('documents.force_delete');
+
+        $document = Document::withTrashed()
+            ->visibleTo($request->user())
+            ->findOrFail($id);
+
+        if (!$document->trashed()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'يجب حذف الوثيقة (نقلها لسلة المحذوفات) قبل الحذف النهائي.',
+            ], 422);
+        }
+
+        if ($document->hasActiveLegalHold()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'لا يمكن الحذف النهائي لوثيقة خاضعة للحجز القانوني (Legal Hold).',
+            ], 422);
+        }
+
+        $this->auditService->log(
+            'force_delete',
+            null,
+            ['id' => $document->id, 'document_number' => $document->document_number, 'title' => $document->title],
+            null,
+            "Document permanently deleted: {$document->document_number}"
+        );
+
+        $document->forceDelete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم حذف الوثيقة نهائياً من النظام.',
+        ]);
     }
 
     // ─── Archive ──────────────────────────────────────────────────
@@ -277,7 +426,7 @@ class DocumentController extends Controller
     {
         $this->checkPermission('documents.archive');
 
-        $document = Document::findOrFail($id);
+        $document = Document::findVisibleOrFail($id, $request->user());
         $document->update([
             'is_archived' => true,
             'archived_at' => now(),
@@ -299,7 +448,7 @@ class DocumentController extends Controller
     {
         $this->checkPermission('documents.restore');
 
-        $document = Document::withTrashed()->findOrFail($id);
+        $document = Document::findVisibleOrFail($id, $request->user(), withTrashed: true);
 
         if ($document->trashed()) {
             $document->restore();
@@ -318,26 +467,67 @@ class DocumentController extends Controller
     {
         $this->checkPermission('documents.approve');
 
-        $document = Document::findOrFail($id);
+        $document = Document::findVisibleOrFail($id, $request->user());
+        $user     = $request->user();
 
-        $request->validate([
+        $validated = $request->validate([
             'comment'  => ['nullable', 'string'],
             'comments' => ['nullable', 'string'],
         ]);
+        $comment = $validated['comment'] ?? $validated['comments'] ?? null;
 
-        $approval = $document->pendingApprovals()->first();
+        $pendingApprovals = $document->pendingApprovals()->get();
 
-        if ($approval) {
-            $approval->update([
+        if ($pendingApprovals->isNotEmpty()) {
+            $myApproval = $pendingApprovals->firstWhere('approver_id', $user->id);
+
+            if (!$myApproval) {
+                if (!$user->isSuperAdmin()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'لا يوجد طلب اعتماد معلق موجه إليك على هذه الوثيقة.',
+                    ], 403);
+                }
+                $myApproval = $pendingApprovals->first();
+            }
+
+            $myApproval->update([
                 'status'      => 'approved',
-                'comments'    => $request->input('comment', $request->input('comments')),
+                'comments'    => $comment,
                 'approved_at' => now(),
             ]);
-        }
 
-        $approvedStatus = Status::where('name', 'approved')->first();
-        if ($approvedStatus) {
-            $document->update(['status_id' => $approvedStatus->id]);
+            if ($user->isSuperAdmin()) {
+                // Final sign-off: resolve any remaining pending steps as well
+                $document->pendingApprovals()->update([
+                    'status'      => 'approved',
+                    'comments'    => $comment,
+                    'approved_at' => now(),
+                ]);
+            }
+
+            // Final approval only when no other approval step is still pending
+            if ($document->pendingApprovals()->count() === 0) {
+                $approvedStatus = Status::where('name', 'approved')->first();
+                if ($approvedStatus) {
+                    $document->update(['status_id' => $approvedStatus->id]);
+                }
+            }
+
+            if ($document->creator && $document->creator->id !== $user->id) {
+                $this->notificationService->notifyApprovalDecision(
+                    $document,
+                    $document->creator,
+                    $user,
+                    'approved',
+                    $comment
+                );
+            }
+        } else {
+            $approvedStatus = Status::where('name', 'approved')->first();
+            if ($approvedStatus) {
+                $document->update(['status_id' => $approvedStatus->id]);
+            }
         }
 
         $this->auditService->log('approve', $document, null, null, "Document approved: {$document->document_number}");
@@ -349,20 +539,52 @@ class DocumentController extends Controller
     {
         $this->checkPermission('documents.reject');
 
-        $document = Document::findOrFail($id);
+        $document = Document::findVisibleOrFail($id, $request->user());
+        $user     = $request->user();
 
-        $request->validate([
+        $validated = $request->validate([
             'comment'  => ['required_without:comments', 'nullable', 'string', 'min:5'],
             'comments' => ['required_without:comment', 'nullable', 'string', 'min:5'],
         ]);
+        $comment = $validated['comment'] ?? $validated['comments'] ?? null;
 
-        $approval = $document->pendingApprovals()->first();
+        $pendingApprovals = $document->pendingApprovals()->get();
 
-        if ($approval) {
-            $approval->update([
+        if ($pendingApprovals->isNotEmpty()) {
+            $myApproval = $pendingApprovals->firstWhere('approver_id', $user->id);
+
+            if (!$myApproval) {
+                if (!$user->isSuperAdmin()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'لا يوجد طلب اعتماد معلق موجه إليك على هذه الوثيقة.',
+                    ], 403);
+                }
+                $myApproval = $pendingApprovals->first();
+            }
+
+            $myApproval->update([
                 'status'   => 'rejected',
-                'comments' => $request->input('comment', $request->input('comments')),
+                'comments' => $comment,
             ]);
+
+            // A rejection ends the whole chain — cancel remaining pending steps
+            $document->pendingApprovals()
+                ->where('id', '!=', $myApproval->id)
+                ->update([
+                    'status'   => 'rejected',
+                    'comments' => 'أُلغي هذا الطلب تلقائياً بعد رفض الوثيقة من مرحلة أخرى.',
+                ]);
+
+            if ($document->creator && $document->creator->id !== $user->id) {
+                $this->notificationService->notifyApprovalDecision(
+                    $document,
+                    $document->creator,
+                    $user,
+                    'rejected',
+                    $comment
+                );
+            }
         }
 
         $rejectedStatus = Status::where('name', 'rejected')->first();
@@ -386,14 +608,14 @@ class DocumentController extends Controller
 
     public function addComment(Request $request, int $id): JsonResponse
     {
-        $this->checkPermission('documents.view');
+        $this->checkPermission('comments.create');
 
         $validated = $request->validate([
             'comment'   => ['required', 'string', 'max:2000'],
             'parent_id' => ['nullable', 'integer', 'exists:comments,id'],
         ]);
 
-        $document = Document::findOrFail($id);
+        $document = Document::findVisibleOrFail($id, $request->user());
         $comment = $document->comments()->create([
             'user_id'     => $request->user()->id,
             'parent_id'   => $validated['parent_id'] ?? null,
@@ -419,6 +641,33 @@ class DocumentController extends Controller
         ]);
     }
 
+    public function deleteComment(Request $request, int $id, int $commentId): JsonResponse
+    {
+        $this->checkPermission('comments.delete');
+
+        $document = Document::findVisibleOrFail($id, $request->user());
+        $comment  = Comment::where('document_id', $document->id)->findOrFail($commentId);
+
+        $comment->delete();
+
+        if ($comment->parent_id === null) {
+            Comment::where('document_id', $document->id)->where('parent_id', $comment->id)->delete();
+        }
+
+        $this->auditService->log(
+            'comment.delete',
+            $document,
+            ['comment_id' => $comment->id, 'comment' => $comment->comment],
+            null,
+            "Deleted comment #{$comment->id} from document {$document->document_number}"
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم حذف التعليق بنجاح.',
+        ]);
+    }
+
     // ─── Batch Operations ─────────────────────────────────────────
 
     public function batch(Request $request): JsonResponse
@@ -434,25 +683,104 @@ class DocumentController extends Controller
         $action = $validated['action'];
         $ids    = $validated['ids'];
         $count  = 0;
+        $user   = $request->user();
 
         switch ($action) {
             case 'approve':
                 $this->checkPermission('documents.approve');
                 $approvedStatus = Status::where('name', 'approved')->first();
-                $docs = Document::whereIn('id', $ids)->get();
+                $docs = Document::whereIn('id', $ids)->visibleTo($user)->get();
                 foreach ($docs as $doc) {
-                    $approval = $doc->pendingApprovals()->first();
-                    if ($approval) {
-                        $approval->update([
-                            'status'      => 'approved',
-                            'comments'    => $request->input('comment', 'اعتماد جماعي آلي'),
-                            'approved_at' => now(),
-                        ]);
+                    $pendingApprovals = $doc->pendingApprovals()->get();
+
+                    if ($pendingApprovals->isNotEmpty()) {
+                        if ($user->isSuperAdmin()) {
+                            // Bulk override: resolve every pending step at once
+                            foreach ($pendingApprovals as $step) {
+                                $step->update([
+                                    'status'      => 'approved',
+                                    'comments'    => $request->input('comment', 'اعتماد جماعي آلي'),
+                                    'approved_at' => now(),
+                                ]);
+                            }
+                        } else {
+                            $myApproval = $pendingApprovals->firstWhere('approver_id', $user->id);
+                            if (!$myApproval) {
+                                continue; // Not this user's approval step
+                            }
+                            $myApproval->update([
+                                'status'      => 'approved',
+                                'comments'    => $request->input('comment', 'اعتماد جماعي آلي'),
+                                'approved_at' => now(),
+                            ]);
+                        }
                     }
-                    if ($approvedStatus) {
+
+                    // Keep the document pending until every approval step is resolved
+                    if ($doc->pendingApprovals()->count() === 0 && $approvedStatus) {
                         $doc->update(['status_id' => $approvedStatus->id]);
                     }
+
+                    if ($doc->creator && $doc->creator->id !== $user->id) {
+                        $this->notificationService->notifyApprovalDecision(
+                            $doc,
+                            $doc->creator,
+                            $user,
+                            'approved',
+                            $request->input('comment')
+                        );
+                    }
+
                     $this->auditService->log('approve', $doc, null, null, "Batch approved: {$doc->document_number}");
+                    $count++;
+                }
+                break;
+
+            case 'reject':
+                $this->checkPermission('documents.reject');
+                $rejectedStatus = Status::where('name', 'rejected')->first();
+                $docs = Document::whereIn('id', $ids)->visibleTo($user)->get();
+                foreach ($docs as $doc) {
+                    $pendingApprovals = $doc->pendingApprovals()->get();
+                    $myApproval = $pendingApprovals->firstWhere('approver_id', $user->id);
+
+                    if ($pendingApprovals->isNotEmpty() && !$myApproval && !$user->isSuperAdmin()) {
+                        continue;
+                    }
+
+                    if (!$myApproval && $user->isSuperAdmin() && $pendingApprovals->isNotEmpty()) {
+                        $myApproval = $pendingApprovals->first();
+                    }
+
+                    if ($myApproval) {
+                        $myApproval->update([
+                            'status'   => 'rejected',
+                            'comments' => $request->input('comment', 'رفض جماعي'),
+                        ]);
+
+                        $doc->pendingApprovals()
+                            ->where('id', '!=', $myApproval->id)
+                            ->update([
+                                'status'   => 'rejected',
+                                'comments' => 'أُلغي هذا الطلب تلقائياً بعد رفض الوثيقة من مرحلة أخرى.',
+                            ]);
+                    }
+
+                    if ($rejectedStatus) {
+                        $doc->update(['status_id' => $rejectedStatus->id]);
+                    }
+
+                    if ($doc->creator && $doc->creator->id !== $user->id) {
+                        $this->notificationService->notifyApprovalDecision(
+                            $doc,
+                            $doc->creator,
+                            $user,
+                            'rejected',
+                            $request->input('comment')
+                        );
+                    }
+
+                    $this->auditService->log('reject', $doc, null, null, "Batch rejected: {$doc->document_number}");
                     $count++;
                 }
                 break;
@@ -460,7 +788,7 @@ class DocumentController extends Controller
             case 'archive':
                 $this->checkPermission('documents.archive');
                 $archivedStatus = Status::where('name', 'archived')->first();
-                $docs = Document::whereIn('id', $ids)->where('is_archived', false)->get();
+                $docs = Document::whereIn('id', $ids)->visibleTo($user)->where('is_archived', false)->get();
                 foreach ($docs as $doc) {
                     $doc->update([
                         'is_archived' => true,
@@ -474,7 +802,7 @@ class DocumentController extends Controller
 
             case 'restore':
                 $this->checkPermission('documents.restore');
-                $docs = Document::withTrashed()->whereIn('id', $ids)->get();
+                $docs = Document::withTrashed()->whereIn('id', $ids)->visibleTo($user)->get();
                 foreach ($docs as $doc) {
                     if ($doc->trashed()) {
                         $doc->restore();
@@ -487,7 +815,7 @@ class DocumentController extends Controller
 
             case 'delete':
                 $this->checkPermission('documents.delete');
-                $docs = Document::whereIn('id', $ids)->get();
+                $docs = Document::whereIn('id', $ids)->visibleTo($user)->where('legal_hold', false)->get();
                 foreach ($docs as $doc) {
                     $this->auditService->log('delete', $doc, ['title' => $doc->title], null, "Batch deleted: {$doc->document_number}");
                     $doc->delete();
@@ -496,11 +824,11 @@ class DocumentController extends Controller
                 break;
 
             case 'change_status':
-                $this->checkPermission('documents.update');
+                $this->checkPermission('documents.change_status');
                 if (!$request->filled('status_id')) {
                     return response()->json(['success' => false, 'message' => 'الحالة الجديدة مطلوبة.'], 422);
                 }
-                $docs = Document::whereIn('id', $ids)->get();
+                $docs = Document::whereIn('id', $ids)->visibleTo($user)->get();
                 foreach ($docs as $doc) {
                     $oldStatus = $doc->status_id;
                     $doc->update(['status_id' => $validated['status_id']]);
@@ -512,6 +840,7 @@ class DocumentController extends Controller
 
         $actionArabic = [
             'approve'       => 'اعتماد',
+            'reject'        => 'رفض',
             'archive'       => 'أرشفة',
             'restore'       => 'استعادة',
             'delete'        => 'حذف',
@@ -552,6 +881,17 @@ class DocumentController extends Controller
             $tagIds[] = $tag->id;
         }
         $document->tags()->sync($tagIds);
+    }
+
+    private function ensureCanAssignConfidentiality(Request $request, int $levelId): void
+    {
+        $user = $request->user();
+
+        if (Document::requiresConfidentialityClearanceFor($levelId)
+            && !$user->isSuperAdmin()
+            && !$user->hasPermission('confidentiality.assign')) {
+            abort(403, 'ليس لديك صلاحية لتصنيف الوثائق بدرجة "سري" أو أعلى.');
+        }
     }
 
     private function checkPermission(string $perm): void
