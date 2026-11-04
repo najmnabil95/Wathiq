@@ -59,4 +59,35 @@ class WatermarkTest extends TestCase
         @unlink($source);
         @unlink($output);
     }
+
+    public function test_pdf_with_broken_cross_reference_is_repaired_and_watermarked(): void
+    {
+        $source = tempnam(sys_get_temp_dir(), 'edms_src_') . '.pdf';
+        $pdf = new Fpdi();
+        $pdf->AddPage();
+        $pdf->SetFont('Helvetica', '', 12);
+        $pdf->Cell(0, 10, 'Damaged cross-reference');
+        $pdf->Output('F', $source);
+
+        $content = (string) file_get_contents($source);
+        file_put_contents($source, (string) preg_replace('/startxref\s+\d+/', "startxref\n0", $content));
+
+        $service = new WatermarkService();
+        $output = $service->apply(
+            $source,
+            'application/pdf',
+            new Document(['document_number' => 'TST-2026-0003']),
+            new User(['email' => 'tester@edms.local'])
+        );
+
+        $this->assertNotNull($output);
+        $this->assertFileExists($output);
+        $this->assertStringStartsWith('%PDF', (string) file_get_contents($output));
+
+        $check = new Fpdi();
+        $this->assertSame(1, $check->setSourceFile($output));
+
+        @unlink($source);
+        @unlink($output);
+    }
 }
