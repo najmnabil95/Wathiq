@@ -4,6 +4,7 @@ use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Symfony\Component\Process\Process;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -129,3 +130,146 @@ Artisan::command('edms:ocr-index {--force : Re-index already processed attachmen
         ]
     );
 })->purpose('Extract text and index attachments for smart full-text search');
+
+/**
+ * Full backup: MySQL dump + stored files + .env, with retention pruning
+ */
+Artisan::command('edms:backup {--keep= : Number of archives to retain}', function () {
+    $this->info("=================================================");
+    $this->info(" IT-EDMS: Full Backup");
+    $this->info("=================================================");
+
+    $keep = max(1, (int) ($this->option('keep') ?: config('edms.backup_keep', 14)));
+    $path = rtrim((string) config('edms.backup_path'), '/\\');
+    $dumpExe = (string) config('edms.mysqldump');
+
+    if (!class_exists(\ZipArchive::class)) {
+        $this->error('PHP zip extension is required.');
+        return 1;
+    }
+
+    if (!is_file($dumpExe)) {
+        $this->error("mysqldump not found at {$dumpExe}");
+        return 1;
+    }
+
+    if (!is_dir($path) && !mkdir($path, 0775, true) && !is_dir($path)) {
+        $this->error("Unable to create backup directory: {$path}");
+        return 1;
+    }
+
+    $connection = config('database.connections.mysql');
+    $database = (string) $connection['database'];
+
+    $tmpBase = tempnam(sys_get_temp_dir(), 'edms_backup_');
+    if ($tmpBase === false) {
+        $this->error('Unable to create a temporary file for the database dump.');
+        return 1;
+    }
+
+    $tmpSql = $tmpBase . '.sql';
+    @unlink($tmpBase);
+
+    $args = [
+        $dumpExe,
+        '--host=' . ($connection['host'] ?? '127.0.0.1'),
+        '--port=' . ($connection['port'] ?? 3306),
+        '--user=' . ($connection['username'] ?? 'root'),
+        '--single-transaction',
+        '--routines',
+        '--triggers',
+        '--events',
+        '--default-character-set=utf8mb4',
+        $database,
+        '--result-file=' . $tmpSql,
+    ];
+
+    $env = [];
+    if (!empty($connection['password'])) {
+        $env['MYSQL_PWD'] = $connection['password'];
+    }
+
+    $process = new Process($args, base_path(), $env ?: null, null, 300);
+    $process->run();
+
+    if (!$process->isSuccessful() || !is_file($tmpSql) || filesize($tmpSql) === 0) {
+        @unlink($tmpSql);
+        $this->error('Database dump failed: ' . trim($process->getErrorOutput() ?: $process->getOutput()));
+        return 1;
+    }
+
+    $stamp = now()->format('Y-m-d_His');
+    $archive = $path . DIRECTORY_SEPARATOR . "edms-backup-{$stamp}.zip";
+    $zip = new \ZipArchive();
+
+    if ($zip->open($archive, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+        @unlink($tmpSql);
+        $this->error("Unable to create archive: {$archive}");
+        return 1;
+    }
+
+    $zip->addFile($tmpSql, 'database.sql');
+
+    if (is_file(base_path('.env'))) {
+        $zip->addFile(base_path('.env'), 'config/.env');
+    }
+
+    $fileCount = 0;
+    $storageRoot = storage_path('app');
+    $iterator = new \RecursiveIteratorIterator(
+        new \RecursiveDirectoryIterator($storageRoot, \FilesystemIterator::SKIP_DOTS),
+        \RecursiveIteratorIterator::SELF_FIRST
+    );
+
+    foreach ($iterator as $file) {
+        if ($file->isLink() || !$file->isFile()) {
+            continue;
+        }
+
+        $relative = str_replace('\\', '/', substr($file->getPathname(), strlen($storageRoot) + 1));
+        $zip->addFile($file->getPathname(), 'storage/app/' . $relative);
+        $fileCount++;
+    }
+
+    $zip->addFromString('manifest.json', json_encode([
+        'generated_at'  => now()->toIso8601String(),
+        'database'      => $database,
+        'documents'     => DB::table('documents')->count(),
+        'users'         => DB::table('users')->count(),
+        'audit_logs'    => DB::table('audit_logs')->count(),
+        'storage_files' => $fileCount,
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+    $zip->close();
+    @unlink($tmpSql);
+
+    $archives = glob($path . DIRECTORY_SEPARATOR . 'edms-backup-*.zip') ?: [];
+    rsort($archives);
+    $removed = 0;
+
+    foreach (array_slice($archives, $keep) as $old) {
+        if (@unlink($old)) {
+            $removed++;
+        }
+    }
+
+    $sizeMb = round(filesize($archive) / 1048576, 2);
+
+    @file_put_contents(
+        storage_path('logs/backup.log'),
+        sprintf("[%s] archive=%s size_mb=%s files=%d pruned=%d\n", now()->toDateTimeString(), $archive, $sizeMb, $fileCount, $removed),
+        FILE_APPEND
+    );
+
+    $this->table(['Item', 'Value'], [
+        ['Archive', $archive],
+        ['Size', $sizeMb . ' MB'],
+        ['Database', $database],
+        ['Storage files', $fileCount],
+        ['Retention', $keep . ' archives'],
+        ['Pruned', $removed],
+    ]);
+
+    $this->info("\n [BACKUP COMPLETE]");
+    return 0;
+})->purpose('Back up the database, stored files, and env configuration');

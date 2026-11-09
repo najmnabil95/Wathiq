@@ -106,20 +106,33 @@ export default function DocumentDetailPage() {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState('');
   const [selectedWorkflowStepId, setSelectedWorkflowStepId] = useState('');
   const [submittingApprovalRequest, setSubmittingApprovalRequest] = useState(false);
+  const [approvalTarget, setApprovalTarget] = useState(null);
+  const [approvalTargetLoading, setApprovalTargetLoading] = useState(false);
+  const [manualApprovalOverride, setManualApprovalOverride] = useState(false);
   const [stepDecisionModal, setStepDecisionModal] = useState({ open: false, approval: null, decision: 'approved', comments: '' });
   const [submittingStepDecision, setSubmittingStepDecision] = useState(false);
 
   const handleOpenRequestApprovalModal = async () => {
     setRequestApprovalModalOpen(true);
-    if (availableUsers.length === 0) {
-      try {
-        const res = await usersAPI.list({ per_page: 100 });
-        const list = res.data?.data?.data || res.data?.data || [];
-        setAvailableUsers(list);
-      } catch (err) {
-        console.error(err);
+    setManualApprovalOverride(false);
+    setSelectedApproverId('');
+
+    try {
+      setApprovalTargetLoading(true);
+      const res = await approvalsAPI.target(id);
+      const target = res.data?.data || null;
+      setApprovalTarget(target);
+      if (!target?.manager) {
+        setManualApprovalOverride(true);
       }
+    } catch (err) {
+      console.error(err);
+      setApprovalTarget(null);
+      setManualApprovalOverride(true);
+    } finally {
+      setApprovalTargetLoading(false);
     }
+
     try {
       const params = { active_only: true };
       if (document?.document_type_id) params.document_type_id = document.document_type_id;
@@ -130,25 +143,46 @@ export default function DocumentDetailPage() {
     }
   };
 
+  const loadApprovalCandidates = async () => {
+    if (availableUsers.length > 0) return;
+    try {
+      const res = await usersAPI.list({ per_page: 100 });
+      const list = res.data?.data?.data || res.data?.data || [];
+      setAvailableUsers(list);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleToggleManualApproval = (checked) => {
+    setManualApprovalOverride(checked);
+    if (!checked) {
+      setSelectedApproverId('');
+    } else {
+      loadApprovalCandidates();
+    }
+  };
+
   const handleSubmitApprovalRequest = async (e) => {
     e.preventDefault();
-    if (!selectedApproverId) {
-      toast.error('يرجى اختيار المسؤول أو المعتمد المطلوب إحالة الوثيقة إليه');
+    if (manualApprovalOverride && !selectedApproverId) {
+      toast.error('يرجى اختيار المعتمد المطلوب إحالة الوثيقة إليه');
       return;
     }
     try {
       setSubmittingApprovalRequest(true);
-      await approvalsAPI.request(id, {
-        approver_id: selectedApproverId,
+      const res = await approvalsAPI.request(id, {
+        approver_id: manualApprovalOverride ? selectedApproverId : null,
         workflow_step_id: selectedWorkflowStepId ? parseInt(selectedWorkflowStepId) : null,
         comments: approvalNotes || null,
       });
-      toast.success('تمت إحالة الوثيقة وإشعار المعتمد بنجاح!');
+      toast.success(res.data?.message || 'تمت إحالة الوثيقة وإشعار المعتمد بنجاح!');
       setRequestApprovalModalOpen(false);
       setSelectedApproverId('');
       setApprovalNotes('');
       setSelectedWorkflowId('');
       setSelectedWorkflowStepId('');
+      setManualApprovalOverride(false);
       fetchDocument();
     } catch (err) {
       toast.error(err.response?.data?.message || 'فشل إرسال طلب الاعتماد');
@@ -1530,7 +1564,7 @@ export default function DocumentDetailPage() {
                   className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2 transition shadow-lg shadow-emerald-600/20 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  إحالة للاعتماد / مرحلة جديدة
+                  إحالة إلى مدير القسم
                 </button>
               )}
             </div>
@@ -1718,7 +1752,7 @@ export default function DocumentDetailPage() {
                 <FileCheck className="w-12 h-12 text-slate-600 mx-auto" />
                 <h4 className="text-sm font-bold text-slate-300">لم يتم تحديد مسار اعتماد مخصص بعد</h4>
                 <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-                  يمكنك إحالة هذه الوثيقة إلى مدير القسم أو المعتمدين المخولين لتسجيل موافقتهم الرسمية وتوثيقها في النظام.
+                  عند الإحالة تُوجَّه الوثيقة تلقائياً إلى مدير القسم لاعتمادها، مع إمكانية اختيار معتمد آخر يدوياً عند الحاجة.
                 </p>
                 {(user?.is_super_admin || hasPermission('workflows.submit')) && (
                   <button
@@ -2513,25 +2547,89 @@ export default function DocumentDetailPage() {
             </div>
 
             <form onSubmit={handleSubmitApprovalRequest} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  المسؤول أو المدير المطلوب اعتماده *
+              <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4" />
+                    التوجيه التلقائي إلى مدير القسم
+                  </span>
+                  {approvalTarget?.document_department?.name_ar && (
+                    <span className="text-[10px] text-slate-400">
+                      قسم: {approvalTarget.document_department.name_ar}
+                    </span>
+                  )}
+                </div>
+
+                {approvalTargetLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+                    <span className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                    جاري تحديد مدير القسم...
+                  </div>
+                ) : approvalTarget?.manager ? (
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/50 border border-slate-800">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-300 font-bold flex items-center justify-center shrink-0 border border-emerald-500/30 text-sm">
+                      {approvalTarget.manager.name?.[0] || 'م'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-white truncate">
+                        {approvalTarget.manager.name}
+                      </p>
+                      <p className="text-[11px] text-slate-400 truncate">
+                        {approvalTarget.manager.department?.name_ar || 'مدير القسم'}
+                        {approvalTarget.manager.email ? ` — ${approvalTarget.manager.email}` : ''}
+                      </p>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 shrink-0">
+                      مدير القسم
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-2 text-xs text-amber-300 leading-relaxed">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>
+                      لا يوجد مدير معيّن لهذا القسم أو لأي قسم أعلى منه. عيّنه من صفحة الأقسام، أو اختر المعتمد يدوياً أدناه.
+                    </span>
+                  </div>
+                )}
+
+                <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-400">
+                  <input
+                    type="checkbox"
+                    checked={manualApprovalOverride}
+                    onChange={(e) => handleToggleManualApproval(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded text-emerald-600 bg-slate-950 border-slate-700 focus:ring-0"
+                  />
+                  اختيار معتمد آخر يدوياً
                 </label>
-                <select
-                  required
-                  value={selectedApproverId}
-                  onChange={(e) => setSelectedApproverId(e.target.value)}
-                  className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
-                >
-                  <option value="">-- اختر المستخدم / المعتمد --</option>
-                  {availableUsers.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} {u.department?.name ? `(${u.department.name})` : ''} - {u.email}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-slate-500 mt-1">سيتم إرسال إشعار فوري وتنبيه للمستخدم المختار للمراجعة واتخاذ القرار.</p>
               </div>
+
+              {manualApprovalOverride && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    المسؤول أو المدير المطلوب اعتماده *
+                  </label>
+                  <select
+                    required
+                    value={selectedApproverId}
+                    onChange={(e) => setSelectedApproverId(e.target.value)}
+                    className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="">-- اختر المستخدم / المعتمد --</option>
+                    {availableUsers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} {u.department?.name ? `(${u.department.name})` : ''} - {u.email}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-500 mt-1">سيتم إرسال إشعار فوري وتنبيه للمستخدم المختار للمراجعة واتخاذ القرار.</p>
+                </div>
+              )}
+
+              {!manualApprovalOverride && approvalTarget?.manager && (
+                <p className="text-[11px] text-slate-500">
+                  سيتم إشعار مدير القسم فوراً وستظهر الوثيقة في قائمة الاعتمادات المعلقة لديه.
+                </p>
+              )}
 
               {availableWorkflows.length > 0 && (
                 <div className="space-y-3 p-3.5 rounded-xl bg-violet-500/5 border border-violet-500/20">

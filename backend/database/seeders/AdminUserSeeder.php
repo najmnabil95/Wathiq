@@ -52,6 +52,11 @@ class AdminUserSeeder extends Seeder
             $manager->roles()->attach($managerRole->id);
         }
 
+        // Route IT document approvals to the IT manager by default
+        if ($itDept && !$itDept->manager_id) {
+            $itDept->update(['manager_id' => $manager->id]);
+        }
+
         // IT Staff demo user
         $staff = User::firstOrCreate(
             ['email' => 'staff@edms.local'],

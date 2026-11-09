@@ -17,6 +17,7 @@ class Department extends Model
         'description',
         'organization_id',
         'parent_id',
+        'manager_id',
         'is_active',
     ];
 
@@ -41,6 +42,11 @@ class Department extends Model
         return $this->hasMany(Department::class, 'parent_id');
     }
 
+    public function manager()
+    {
+        return $this->belongsTo(User::class, 'manager_id');
+    }
+
     public function users()
     {
         return $this->hasMany(User::class);
@@ -61,5 +67,31 @@ class Department extends Model
     public function scopeRoots($query)
     {
         return $query->whereNull('parent_id');
+    }
+
+    /**
+     * The approver for documents filed under this department: its active
+     * manager, otherwise the nearest ancestor department that has one.
+     */
+    public function resolveApprovalManager(): ?User
+    {
+        $department = $this;
+        $visited = [];
+
+        while ($department && !isset($visited[$department->id])) {
+            $visited[$department->id] = true;
+
+            $manager = $department->manager()
+                ->where('status', 'active')
+                ->first();
+
+            if ($manager && $manager->hasPermission('workflows.approve')) {
+                return $manager;
+            }
+
+            $department = $department->parent()->first();
+        }
+
+        return null;
     }
 }

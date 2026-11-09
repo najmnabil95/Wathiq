@@ -83,6 +83,7 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
     // Approvals & Workflow
     Route::get   ('/approvals/pending',                        [ApprovalController::class, 'pending']);
     Route::get   ('/documents/{id}/approvals',                 [ApprovalController::class, 'index']);
+    Route::get   ('/documents/{id}/approvals/target',          [ApprovalController::class, 'target']);
     Route::post  ('/documents/{id}/approvals',                 [ApprovalController::class, 'store']);
     Route::put   ('/documents/{id}/approvals/{approvalId}',    [ApprovalController::class, 'decide']);
 

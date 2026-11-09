@@ -206,26 +206,28 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Quick Demo Logins */}
-          <div className="mt-5 pt-4" style={{ borderTop: '1px solid var(--app-user-chip-border)' }}>
-            <p className="text-[11px] text-center font-semibold mb-2.5" style={{ color: 'var(--app-footer-text)' }}>
-              — دخول تجريبي سريع —
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {demoUsers.map((u, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setForm({ email: u.email, password: u.password, remember_me: true })}
-                  className="px-2 py-2 rounded-xl text-center transition-all press-effect"
-                  style={{ background: u.bg, border: `1px solid ${u.border}`, color: u.color, fontSize: '11px', fontWeight: 700, lineHeight: 1.3 }}
-                  title={`${u.email} / ${u.password}`}
-                >
-                  {u.label}
-                </button>
-              ))}
+          {/* Quick Demo Logins — development only, never in production builds */}
+          {import.meta.env.DEV && (
+            <div className="mt-5 pt-4" style={{ borderTop: '1px solid var(--app-user-chip-border)' }}>
+              <p className="text-[11px] text-center font-semibold mb-2.5" style={{ color: 'var(--app-footer-text)' }}>
+                — دخول تجريبي سريع —
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {demoUsers.map((u, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setForm({ email: u.email, password: u.password, remember_me: true })}
+                    className="px-2 py-2 rounded-xl text-center transition-all press-effect"
+                    style={{ background: u.bg, border: `1px solid ${u.border}`, color: u.color, fontSize: '11px', fontWeight: 700, lineHeight: 1.3 }}
+                    title={`${u.email} / ${u.password}`}
+                  >
+                    {u.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Footer */}
           <p className="text-center text-[11px] mt-4 pt-3" style={{ borderTop: '1px solid var(--app-user-chip-border)', color: 'var(--app-footer-muted)' }}>

@@ -1,14 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  departmentsAPI
+  departmentsAPI,
+  usersAPI
 } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import {
   Building2, GitFork, Plus, Search, Edit3, Trash2,
   ChevronDown, ChevronRight, FileText, Users, CheckCircle2,
   AlertCircle, Shield, FolderTree, ArrowLeft, RefreshCw,
-  Layers, CornerDownLeft
+  Layers, CornerDownLeft, UserCheck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -18,6 +19,7 @@ export default function DepartmentsPage() {
   const canManage = isSuperAdmin || hasPermission('departments.manage');
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
   const [selectedParentFilter, setSelectedParentFilter] = useState('all');
   const [expandedDepts, setExpandedDepts] = useState({});
@@ -36,12 +38,23 @@ export default function DepartmentsPage() {
     name_ar: '',
     description: '',
     parent_id: '',
+    manager_id: '',
     is_active: true,
   });
 
   useEffect(() => {
     fetchDepartments();
   }, []);
+
+  useEffect(() => {
+    if (!canManage) return;
+    usersAPI.list({ per_page: 100, status: 'active' })
+      .then(res => {
+        const list = res.data?.data?.data || res.data?.data || [];
+        setUsers(list);
+      })
+      .catch(() => {});
+  }, [canManage]);
 
   const fetchDepartments = async () => {
     try {
@@ -142,6 +155,7 @@ export default function DepartmentsPage() {
       name_ar: '',
       description: '',
       parent_id: parentId ? String(parentId) : '',
+      manager_id: '',
       is_active: true,
     });
     setModalOpen(true);
@@ -158,6 +172,7 @@ export default function DepartmentsPage() {
       name_ar: dept.name_ar || '',
       description: dept.description || '',
       parent_id: dept.parent_id ? String(dept.parent_id) : '',
+      manager_id: dept.manager_id ? String(dept.manager_id) : '',
       is_active: dept.is_active ?? true,
     });
     setModalOpen(true);
@@ -198,6 +213,7 @@ export default function DepartmentsPage() {
         name: formData.name.trim() || formData.name_ar.trim(),
         description: formData.description.trim() || null,
         parent_id: isBranch && formData.parent_id ? parseInt(formData.parent_id) : null,
+        manager_id: formData.manager_id ? parseInt(formData.manager_id) : null,
         is_active: formData.is_active,
       };
 
@@ -429,6 +445,16 @@ export default function DepartmentsPage() {
                         <span className="text-[11px] px-2.5 py-0.5 rounded-md font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
                           {branches.length} فروع تابعة
                         </span>
+                        {root.manager ? (
+                          <span className="text-[11px] px-2.5 py-0.5 rounded-md font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                            <UserCheck className="w-3 h-3" />
+                            المدير: {root.manager.name}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] px-2.5 py-0.5 rounded-md font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            بدون مدير
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-slate-400 truncate mt-0.5">
                         {root.description || 'إدارة مركزية رئيسية'}
@@ -523,6 +549,12 @@ export default function DepartmentsPage() {
                                 ) : (
                                   <span className="text-[10px] text-rose-400 bg-rose-500/10 px-2 py-0.2 rounded border border-rose-500/20">
                                     معطل
+                                  </span>
+                                )}
+                                {branch.manager && (
+                                  <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.2 rounded border border-emerald-500/20 flex items-center gap-1">
+                                    <UserCheck className="w-3 h-3" />
+                                    {branch.manager.name}
                                   </span>
                                 )}
                               </div>
@@ -731,6 +763,28 @@ export default function DepartmentsPage() {
                   placeholder="وصف مختصر لطبيعة المعاملات والوثائق الخاصة بهذا الفرع..."
                   className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none"
                 />
+              </div>
+
+              {/* Manager — approval routing target */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  مدير القسم (تُوجَّه إليه طلبات الاعتماد تلقائياً)
+                </label>
+                <select
+                  value={formData.manager_id}
+                  onChange={(e) => setFormData({ ...formData, manager_id: e.target.value })}
+                  className="w-full bg-[#070d1a] border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="">بدون مدير — يُطلب اختيار المعتمد يدوياً</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} — {u.email}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  يجب أن يملك المدير صلاحية اعتماد الوثائق. إذا لم يُحدَّد، يبحث النظام تلقائياً عن مدير القسم الأعلى.
+                </p>
               </div>
 
               {/* Active Toggle */}

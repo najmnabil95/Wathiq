@@ -224,6 +224,7 @@ export const notificationsAPI = {
 // ─── Approvals & Workflows ─────────────────────────────────────
 export const approvalsAPI = {
   list:       (docId)                => api.get(`/documents/${docId}/approvals`),
+  target:     (docId)                => api.get(`/documents/${docId}/approvals/target`),
   request:    (docId, data)          => api.post(`/documents/${docId}/approvals`, data),
   decide:     (docId, approvalId, d) => api.put(`/documents/${docId}/approvals/${approvalId}`, d),
   getPending: ()                     => api.get('/approvals/pending'),

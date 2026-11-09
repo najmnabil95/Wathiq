@@ -16,6 +16,7 @@ export default function DocumentScannerModal({
   const [cameras, setCameras] = useState([]);
   const [activeCameraIndex, setActiveCameraIndex] = useState(0);
   const [cameraError, setCameraError] = useState(null);
+  const [cameraErrorCode, setCameraErrorCode] = useState(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
@@ -40,8 +41,15 @@ export default function DocumentScannerModal({
   const startCamera = useCallback(async (facing = 'environment') => {
     try {
       setCameraError(null);
+      setCameraErrorCode(null);
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
+      }
+
+      if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+        setCameraErrorCode('InsecureContext');
+        setCameraError('المتصفح يمنع الكاميرا لأن الاتصال غير موثوق. افتح النظام عبر HTTPS بشهادة صالحة، أو اختر صورة من جهازك.');
+        return;
       }
 
       // Check available media devices
@@ -72,11 +80,19 @@ export default function DocumentScannerModal({
       setTorchOn(false);
     } catch (err) {
       console.warn('Camera access issue:', err);
-      setCameraError(
-        err.name === 'NotAllowedError'
-          ? 'تم رفض إذن الوصول إلى الكاميرا. يمكنك استخدام خيار رفع الصورة من الجهاز.'
-          : 'تعذر تشغيل الكاميرا المباشرة على هذا الجهاز. يمكنك اختيار صورة من جهازك.'
-      );
+      setCameraErrorCode(err.name || 'UnknownError');
+      const messages = {
+        NotAllowedError: 'تم رفض إذن الوصول إلى الكاميرا. اسمح بالكاميرا لهذا الموقع من إعدادات المتصفح ثم أعد المحاولة، أو اختر صورة من جهازك.',
+        PermissionDeniedError: 'تم رفض إذن الوصول إلى الكاميرا. اسمح بالكاميرا لهذا الموقع من إعدادات المتصفح، أو اختر صورة من جهازك.',
+        NotFoundError: 'لا توجد كاميرا متاحة على هذا الجهاز. وصّل كاميرا خارجية أو اختر صورة من جهازك.',
+        DevicesNotFoundError: 'لا توجد كاميرا متاحة على هذا الجهاز. وصّل كاميرا خارجية أو اختر صورة من جهازك.',
+        NotReadableError: 'الكاميرا مستخدمة حالياً من تطبيق آخر أو أوقفها النظام. أغلق التطبيقات التي تستخدم الكاميرا ثم أعد المحاولة.',
+        TrackStartError: 'الكاميرا مستخدمة حالياً من تطبيق آخر أو أوقفها النظام. أغلق التطبيقات التي تستخدم الكاميرا ثم أعد المحاولة.',
+        AbortError: 'توقف تشغيل الكاميرا. أعد المحاولة بعد لحظات.',
+        OverconstrainedError: 'إعدادات الكاميرا المطلوبة غير مدعومة على هذا الجهاز.',
+        SecurityError: 'منع المتصفح الوصول إلى الكاميرا لأسباب أمنية (اتصال غير موثوق أو سياسة جهاز).',
+      };
+      setCameraError(messages[err.name] || `تعذر تشغيل الكاميرا المباشرة على هذا الجهاز (${err.name}). يمكنك اختيار صورة من جهازك.`);
     }
   }, [stream]);
 
@@ -91,6 +107,13 @@ export default function DocumentScannerModal({
       }
     };
   }, [isOpen]);
+
+  // Attach the stream once the <video> is mounted (e.g. after a successful retry)
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream, cameraError]);
 
   // Clean stream on unmount or when captured image is set
   const stopStream = () => {
@@ -343,14 +366,26 @@ export default function DocumentScannerModal({
               {cameraError ? (
                 <div className="text-center p-6 max-w-md">
                   <AlertCircle className="w-12 h-12 text-amber-400 mx-auto mb-3" />
-                  <p className="text-sm text-slate-300 mb-4">{cameraError}</p>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="btn btn-primary text-sm gap-2"
-                  >
-                    <ImageIcon className="w-4 h-4" />
-                    اختيار صورة من الجهاز
-                  </button>
+                  <p className="text-sm text-slate-300 mb-1">{cameraError}</p>
+                  {cameraErrorCode && (
+                    <p className="text-[10px] text-slate-500 mb-4" dir="ltr">{cameraErrorCode}</p>
+                  )}
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      onClick={() => startCamera()}
+                      className="btn btn-secondary text-sm gap-2"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      إعادة المحاولة
+                    </button>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="btn btn-primary text-sm gap-2"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      اختيار صورة من الجهاز
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <>

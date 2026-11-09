@@ -15,7 +15,7 @@ class DepartmentController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = Department::with(['parent', 'children', 'organization'])
+        $query = Department::with(['parent', 'children', 'organization', 'manager:id,name,email,employee_number,department_id'])
             ->withCount(['documents', 'users', 'children']);
 
         if ($request->boolean('roots_only')) {
@@ -50,7 +50,7 @@ class DepartmentController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data'    => Department::with(['parent', 'children.children', 'organization'])
+            'data'    => Department::with(['parent', 'children.children', 'organization', 'manager:id,name,email,employee_number,department_id'])
                 ->withCount(['documents', 'users', 'children'])
                 ->findOrFail($id),
         ]);
@@ -67,6 +67,7 @@ class DepartmentController extends Controller
             'description'     => ['nullable', 'string'],
             'organization_id' => ['nullable', 'exists:organizations,id'],
             'parent_id'       => ['nullable', 'exists:departments,id'],
+            'manager_id'      => ['nullable', 'exists:users,id'],
             'is_active'       => ['sometimes', 'boolean'],
         ]);
 
@@ -75,7 +76,7 @@ class DepartmentController extends Controller
         }
 
         $dept = Department::create($validated);
-        $dept->load(['parent', 'children', 'organization']);
+        $dept->load(['parent', 'children', 'organization', 'manager:id,name,email,employee_number,department_id']);
         $this->auditService->log('create', $dept, null, $validated, "Department/Branch created: {$dept->name_ar} ({$dept->code})");
 
         return response()->json(['success' => true, 'data' => $dept], 201);
@@ -94,6 +95,7 @@ class DepartmentController extends Controller
             'description'     => ['nullable', 'string'],
             'organization_id' => ['nullable', 'exists:organizations,id'],
             'parent_id'       => ['nullable', 'exists:departments,id'],
+            'manager_id'      => ['nullable', 'exists:users,id'],
             'is_active'       => ['sometimes', 'boolean'],
         ]);
 
@@ -111,7 +113,7 @@ class DepartmentController extends Controller
 
         [$old, $new] = $this->auditService->getDiff($dept->fill($validated));
         $dept->save();
-        $dept->load(['parent', 'children', 'organization']);
+        $dept->load(['parent', 'children', 'organization', 'manager:id,name,email,employee_number,department_id']);
 
         $this->auditService->log('update', $dept, $old, $new);
 

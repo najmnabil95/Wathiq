@@ -39,6 +39,38 @@ class ApprovalController extends Controller
     }
 
     /**
+     * Resolve the default approver for a document (department manager).
+     */
+    public function target(Request $request, int $documentId): JsonResponse
+    {
+        $this->checkPermission('documents.view');
+
+        $document = Document::findVisibleOrFail($documentId, $request->user());
+        $document->loadMissing('department');
+
+        $manager = $document->department?->resolveApprovalManager();
+        $manager?->loadMissing('department:id,name,name_ar,parent_id');
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'manager' => $manager ? [
+                    'id'              => $manager->id,
+                    'name'            => $manager->name,
+                    'email'           => $manager->email,
+                    'employee_number' => $manager->employee_number,
+                    'department'      => $manager->department
+                        ? $manager->department->only(['id', 'name', 'name_ar'])
+                        : null,
+                ] : null,
+                'document_department' => $document->department
+                    ? $document->department->only(['id', 'name', 'name_ar'])
+                    : null,
+            ],
+        ]);
+    }
+
+    /**
      * Request approval / add approval step for a document.
      */
     public function store(Request $request, int $documentId): JsonResponse
@@ -46,14 +78,28 @@ class ApprovalController extends Controller
         $this->checkPermission('workflows.submit');
 
         $document = Document::findVisibleOrFail($documentId, $request->user());
+        $document->loadMissing('department');
 
         $validated = $request->validate([
-            'approver_id'      => ['required', 'exists:users,id'],
+            'approver_id'      => ['nullable', 'exists:users,id'],
             'workflow_step_id' => ['nullable', 'exists:workflow_steps,id'],
             'comments'         => ['nullable', 'string', 'max:500'],
         ]);
 
-        $approver = User::findOrFail($validated['approver_id']);
+        $autoRouted = empty($validated['approver_id']);
+
+        if ($autoRouted) {
+            $approver = $document->department?->resolveApprovalManager();
+
+            if (!$approver) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'لا يوجد مدير قسم معيّن لهذه الوثيقة (أو لأي قسم أعلى منه) يملك صلاحية الاعتماد. عيّن مدير القسم من صفحة الأقسام أو اختر المعتمد يدوياً.',
+                ], 422);
+            }
+        } else {
+            $approver = User::findOrFail($validated['approver_id']);
+        }
 
         // Prevent duplicate pending approval for the same user on this document
         $existingPending = Approval::where('document_id', $document->id)
@@ -90,16 +136,23 @@ class ApprovalController extends Controller
             'approval_requested',
             $document,
             null,
-            ['approver_id' => $approver->id, 'approver_name' => $approver->name],
+            [
+                'approver_id' => $approver->id,
+                'approver_name' => $approver->name,
+                'auto_routed' => $autoRouted,
+            ],
             "Approval requested from {$approver->name} for document {$document->document_number}"
         );
 
         $approval->load(['approver:id,name,email,avatar', 'workflowStep']);
 
         return response()->json([
-            'success' => true,
-            'message' => "تم إرسال طلب الاعتماد إلى {$approver->name} بنجاح وإشعاره فورياً.",
-            'data'    => $approval,
+            'success'     => true,
+            'message'     => $autoRouted
+                ? "تمت الإحالة تلقائياً إلى مدير القسم: {$approver->name} وإشعاره فورياً."
+                : "تم إرسال طلب الاعتماد إلى {$approver->name} بنجاح وإشعاره فورياً.",
+            'auto_routed' => $autoRouted,
+            'data'        => $approval,
         ], 201);
     }
 

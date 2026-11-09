@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { documentsAPI, categoriesAPI, documentTypesAPI, settingsAPI, organizationsAPI, departmentsAPI, attachmentsAPI } from '../services/api';
 import { useAuthStore } from '../store/authStore';
-import { ArrowRight, Save, Plus, X, Upload, FileText, AlertCircle, Loader2, Camera } from 'lucide-react';
+import { ArrowRight, Save, Plus, X, Upload, FileText, AlertCircle, Loader2, Camera, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DocumentScannerModal from '../components/common/DocumentScannerModal';
 
@@ -106,6 +106,7 @@ export default function CreateDocumentPage() {
   const [confLevels, setConfLevels]       = useState([]);
   const [dynamicFields, setDynamicFields] = useState([]);
   const [scannerOpen, setScannerOpen]     = useState(false);
+  const [showAdvanced, setShowAdvanced]   = useState(false);
 
   const [form, setForm] = useState({
     title:                    '',
@@ -261,7 +262,7 @@ export default function CreateDocumentPage() {
           </button>
           <div>
             <h1 className="page-title">وثيقة جديدة</h1>
-            <p className="page-subtitle">إنشاء وثيقة جديدة في النظام</p>
+            <p className="page-subtitle">املأ الحقول الأساسية فقط ثم احفظ — الحقول الإضافية اختيارية</p>
           </div>
         </div>
         <button type="submit" disabled={saving} className="btn btn-primary w-full sm:w-auto">
@@ -311,14 +312,6 @@ export default function CreateDocumentPage() {
               </div>
             </div>
 
-            {/* Original Number */}
-            <div>
-              <label className="form-label">الرقم الأصلي للوثيقة (الورقية)</label>
-              <input type="text" name="original_number" value={form.original_number}
-                     onChange={handleChange} className="form-input"
-                     placeholder="رقم الوثيقة الورقية إن وجد..." dir="ltr" />
-            </div>
-
             {/* Description */}
             <div>
               <label className="form-label">الوصف</label>
@@ -326,14 +319,69 @@ export default function CreateDocumentPage() {
                         className="form-input" rows={3}
                         placeholder="وصف مختصر للوثيقة..." />
             </div>
+          </div>
 
-            {/* Notes */}
-            <div>
-              <label className="form-label">ملاحظات</label>
-              <textarea name="notes" value={form.notes} onChange={handleChange}
-                        className="form-input" rows={2}
-                        placeholder="ملاحظات إضافية..." />
-            </div>
+          {/* ── Optional advanced fields ── */}
+          <div className="glass p-4 sm:p-5">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(v => !v)}
+              className="w-full flex items-center justify-between gap-3 cursor-pointer"
+            >
+              <div className="text-right">
+                <span className="font-bold text-sm" style={{ color: '#7d8aa8' }}>حقول اختيارية إضافية</span>
+                <span className="block text-[11px] mt-0.5" style={{ color: '#526080' }}>
+                  الرقم الورقي، الجهة، الوسوم، الموقع الفيزيائي، الملاحظات، تاريخ الاستلام
+                </span>
+              </div>
+              <ChevronDown
+                size={16}
+                className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
+                style={{ color: '#526080' }}
+              />
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
+                <div>
+                  <label className="form-label">الرقم الأصلي للوثيقة (الورقية)</label>
+                  <input type="text" name="original_number" value={form.original_number}
+                         onChange={handleChange} className="form-input"
+                         placeholder="رقم الوثيقة الورقية إن وجد..." dir="ltr" />
+                </div>
+                <div>
+                  <label className="form-label">تاريخ الاستلام</label>
+                  <input type="datetime-local" name="received_at" value={form.received_at}
+                         onChange={handleChange} className="form-input" />
+                </div>
+                <div>
+                  <label className="form-label">الجهة / المؤسسة</label>
+                  <select name="organization_id" value={form.organization_id} onChange={handleChange}
+                          className="form-input form-select bg-[#0d1527] text-slate-100">
+                    <option value="" className="bg-[#0d1527] text-slate-400">اختر المؤسسة / الجهة...</option>
+                    {organizations.map(o => <option key={o.id} value={o.id} className="bg-[#0d1527] text-slate-100">{o.name_ar || o.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">الموقع الورقي</label>
+                  <input type="text" name="physical_location" value={form.physical_location}
+                         onChange={handleChange} className="form-input"
+                         placeholder="رف 3، مجلد 12..." />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="form-label">الوسوم (Tags)</label>
+                  <input type="text" name="tags" value={form.tags} onChange={handleChange}
+                         className="form-input" placeholder="وسم1, وسم2, وسم3..." />
+                  <p className="text-xs mt-1" style={{ color: '#526080' }}>افصل الوسوم بفاصلة</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="form-label">ملاحظات</label>
+                  <textarea name="notes" value={form.notes} onChange={handleChange}
+                            className="form-input" rows={2}
+                            placeholder="ملاحظات إضافية..." />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ── Dynamic Fields ── */}
@@ -420,7 +468,7 @@ export default function CreateDocumentPage() {
 
           {/* Dates */}
           <div className="glass p-5 space-y-4">
-            <h3 className="font-bold text-sm uppercase tracking-wide" style={{ color: '#526080' }}>التواريخ</h3>
+            <h3 className="font-bold text-sm uppercase tracking-wide" style={{ color: '#526080' }}>تاريخ الوثيقة</h3>
             <div>
               <label className="form-label">تاريخ الوثيقة <span className="required">*</span></label>
               <input type="date" name="document_date" value={form.document_date}
@@ -428,16 +476,11 @@ export default function CreateDocumentPage() {
                      className={`form-input ${errors.document_date ? 'border-red-500/50' : ''}`} />
               {errors.document_date && <p className="form-error"><AlertCircle size={12}/>{errors.document_date}</p>}
             </div>
-            <div>
-              <label className="form-label">تاريخ الاستلام</label>
-              <input type="datetime-local" name="received_at" value={form.received_at}
-                     onChange={handleChange} className="form-input" />
-            </div>
           </div>
 
-          {/* Department + Org */}
+          {/* Department */}
           <div className="glass p-5 space-y-4">
-            <h3 className="font-bold text-sm uppercase tracking-wide" style={{ color: '#526080' }}>التصنيف الإداري والفروع</h3>
+            <h3 className="font-bold text-sm uppercase tracking-wide" style={{ color: '#526080' }}>القسم أو الفرع</h3>
             <div>
               <label className="form-label">القسم أو الفرع التابع <span className="required">*</span></label>
               <select
@@ -482,14 +525,6 @@ export default function CreateDocumentPage() {
 
               {errors.department_id && <p className="form-error"><AlertCircle size={12}/>{errors.department_id}</p>}
             </div>
-            <div>
-              <label className="form-label">الجهة / المؤسسة</label>
-              <select name="organization_id" value={form.organization_id} onChange={handleChange}
-                      className="form-input form-select bg-[#0d1527] text-slate-100">
-                <option value="" className="bg-[#0d1527] text-slate-400">اختر المؤسسة / الجهة...</option>
-                {organizations.map(o => <option key={o.id} value={o.id} className="bg-[#0d1527] text-slate-100">{o.name_ar || o.name}</option>)}
-              </select>
-            </div>
           </div>
 
           {/* Confidentiality */}
@@ -525,23 +560,6 @@ export default function CreateDocumentPage() {
             {errors.confidentiality_level_id && (
               <p className="form-error"><AlertCircle size={12}/>{errors.confidentiality_level_id}</p>
             )}
-          </div>
-
-          {/* Tags + Location */}
-          <div className="glass p-5 space-y-4">
-            <h3 className="font-bold text-sm uppercase tracking-wide" style={{ color: '#526080' }}>معلومات إضافية</h3>
-            <div>
-              <label className="form-label">الوسوم (Tags)</label>
-              <input type="text" name="tags" value={form.tags} onChange={handleChange}
-                     className="form-input" placeholder="وسم1, وسم2, وسم3..." />
-              <p className="text-xs mt-1" style={{ color: '#526080' }}>افصل الوسوم بفاصلة</p>
-            </div>
-            <div>
-              <label className="form-label">الموقع الورقي</label>
-              <input type="text" name="physical_location" value={form.physical_location}
-                     onChange={handleChange} className="form-input"
-                     placeholder="رف 3، مجلد 12..." />
-            </div>
           </div>
 
           {/* Submit mobile */}
