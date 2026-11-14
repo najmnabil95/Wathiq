@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host --port 5173",
+    "prebuild": "node scripts/clean-assets.mjs",
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview"
