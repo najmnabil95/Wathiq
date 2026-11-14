@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { usersAPI, rolesAPI, departmentsAPI } from '../services/api';
@@ -7,7 +7,7 @@ import {
   Users, UserPlus, Search, Shield, Building2, Mail,
   CheckCircle2, XCircle, Edit3, Trash2,
   Lock, KeyRound, ShieldCheck, UserCheck, AlertCircle, X,
-  UserX, RefreshCw, Power
+  UserX, RefreshCw, Power, ChevronDown, ChevronRight, ShieldAlert
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -45,6 +45,16 @@ export default function UsersPage() {
   const [resetForm, setResetForm] = useState({ password: '', password_confirmation: '' });
   const [resetting, setResetting] = useState(false);
 
+  // Per-user permission overrides modal
+  const [permUser, setPermUser] = useState(null);
+  const [permData, setPermData] = useState(null);
+  const [permLoading, setPermLoading] = useState(false);
+  const [permSaving, setPermSaving] = useState(false);
+  const [permOverrides, setPermOverrides] = useState({});
+  const [permSearch, setPermSearch] = useState('');
+  const [permOnlyOverrides, setPermOnlyOverrides] = useState(false);
+  const [permCollapsed, setPermCollapsed] = useState({});
+
   const isSuperAdmin = currentUser?.is_super_admin || currentUser?.roles?.some(r => r.name === 'super_admin');
   const canView = isSuperAdmin || hasPermission('users.view');
   const canCreate = isSuperAdmin || hasPermission('users.create');
@@ -52,6 +62,7 @@ export default function UsersPage() {
   const canDelete = isSuperAdmin || hasPermission('users.delete');
   const canChangeStatus = isSuperAdmin || hasPermission('users.change_status');
   const canResetPassword = isSuperAdmin || hasPermission('users.reset_password');
+  const canAssignPermissions = isSuperAdmin || hasPermission('roles.assign') || hasPermission('roles.manage');
 
   useEffect(() => {
     fetchData();
@@ -108,7 +119,7 @@ export default function UsersPage() {
       email: '',
       password: '',
       password_confirmation: '',
-      department_id: departments[0]?.id || '',
+      department_id: currentUser?.department?.id || currentUser?.department_id || departments[0]?.id || '',
       role: 'it_staff',
       is_active: true,
     });
@@ -177,10 +188,68 @@ export default function UsersPage() {
     }
   };
 
+  const handleOpenPermissions = async (user) => {
+    setPermUser(user);
+    setPermData(null);
+    setPermOverrides({});
+    setPermSearch('');
+    setPermOnlyOverrides(false);
+    setPermCollapsed({});
+    setPermLoading(true);
+    try {
+      const res = await usersAPI.permissions(user.id);
+      const data = res.data?.data || null;
+      const map = {};
+      (data?.modules || []).forEach((m) => m.permissions.forEach((p) => {
+        if (p.override === 'grant' || p.override === 'deny') map[p.id] = p.override;
+      }));
+      setPermData(data);
+      setPermOverrides(map);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'فشل تحميل شجرة الصلاحيات');
+      setPermUser(null);
+    } finally {
+      setPermLoading(false);
+    }
+  };
+
+  const setOverride = (permissionId, effect) => {
+    setPermOverrides((prev) => {
+      const next = { ...prev };
+      if (!effect) delete next[permissionId];
+      else next[permissionId] = effect;
+      return next;
+    });
+  };
+
+  const handleSavePermissions = async () => {
+    if (!permUser) return;
+    try {
+      setPermSaving(true);
+      const overrides = Object.entries(permOverrides).map(([id, effect]) => ({
+        permission_id: Number(id),
+        effect,
+      }));
+      await usersAPI.updatePermissions(permUser.id, overrides);
+      toast.success('تم تحديث الصلاحيات الفردية بنجاح');
+      setPermUser(null);
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'فشل حفظ الصلاحيات الفردية');
+    } finally {
+      setPermSaving(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.email.trim()) {
       toast.error('يرجى ملء الحقول الإلزامية');
+      return;
+    }
+
+    if (!formData.department_id) {
+      toast.error('يجب تحديد القسم أو الفرع التابع للمستخدم');
       return;
     }
 
@@ -306,6 +375,28 @@ export default function UsersPage() {
   const staffCount = safeUsers.filter((u) =>
     u.roles?.some((r) => r.name === 'it_staff')
   ).length;
+
+  // Filtered permission modules for the per-user overrides modal
+  const permModules = useMemo(() => {
+    if (!permData?.modules) return [];
+    const q = permSearch.trim().toLowerCase();
+    return permData.modules
+      .map((m) => {
+        const filteredPermissions = m.permissions.filter((p) => {
+          const matchesSearch =
+            !q ||
+            (p.display_name_ar || '').toLowerCase().includes(q) ||
+            (p.name || '').toLowerCase().includes(q);
+          const matchesOverride = !permOnlyOverrides || !!permOverrides[p.id];
+          return matchesSearch && matchesOverride;
+        });
+        return { ...m, filteredPermissions };
+      })
+      .filter((m) => m.filteredPermissions.length > 0);
+  }, [permData, permSearch, permOnlyOverrides, permOverrides]);
+
+  const togglePermModule = (key) =>
+    setPermCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
 
   if (permissionDenied && !canView) {
     return (
@@ -579,6 +670,13 @@ export default function UsersPage() {
                         <span className={`text-xs px-2.5 py-1 rounded-lg border font-medium inline-block ${roleColors[roleName] || roleColors.viewer}`}>
                           {roleLabel}
                         </span>
+                        {u.permission_overrides_count > 0 && (
+                          <div className="mt-1.5">
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">
+                              {u.permission_overrides_count} استثناء فردي
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       <td className="p-4">
@@ -619,6 +717,15 @@ export default function UsersPage() {
 
                       <td className="p-4 text-center">
                         <div className="flex items-center justify-center gap-2">
+                          {canAssignPermissions && u.id !== currentUser?.id && !u.roles?.some((r) => r.name === 'super_admin') && (
+                            <button
+                              onClick={() => handleOpenPermissions(u)}
+                              className="p-2 rounded-xl bg-slate-800 hover:bg-indigo-600/30 text-slate-300 hover:text-indigo-300 border border-slate-700/60 transition cursor-pointer"
+                              title="الصلاحيات الفردية (منح / سحب)"
+                            >
+                              <ShieldCheck className="w-4 h-4" />
+                            </button>
+                          )}
                           {canUpdate && (
                             <button
                               onClick={() => handleOpenEdit(u)}
@@ -766,7 +873,7 @@ export default function UsersPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">القسم أو الفرع التابع</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">القسم أو الفرع التابع <span className="text-rose-400">*</span></label>
                     <select
                       value={formData.department_id}
                       onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
@@ -911,6 +1018,261 @@ export default function UsersPage() {
         </div>,
         document.body
       )}
+
+      {/* ── PER-USER PERMISSION OVERRIDES MODAL ────────────────────── */}
+      {permUser && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md"
+          style={{ direction: 'rtl', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
+          onClick={() => !permSaving && setPermUser(null)}
+        >
+          <div
+            className="bg-[#0c1427] border border-slate-800 rounded-3xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden my-auto text-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 shrink-0 bg-[#0c1427]">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2.5 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold text-white truncate">الصلاحيات الفردية — {permUser.name}</h3>
+                  <p className="text-xs text-slate-400 mt-0.5 truncate">
+                    استثناءات خاصة فوق صلاحيات الأدوار (منح / سحب صريح)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !permSaving && setPermUser(null)}
+                className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition flex items-center justify-center cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {permLoading ? (
+              <div className="flex flex-col items-center justify-center p-16 text-slate-400">
+                <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
+                <p className="text-xs font-medium">جاري تحميل شجرة الصلاحيات...</p>
+              </div>
+            ) : !permData ? (
+              <div className="p-12 text-center text-slate-400 text-sm">تعذر تحميل بيانات الصلاحيات.</div>
+            ) : (
+              <>
+                {/* Summary */}
+                <div className="px-6 py-4 border-b border-slate-800/80 space-y-3 shrink-0 bg-slate-950/20">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] text-slate-400">الأدوار:</span>
+                    {permData.user?.roles?.length ? permData.user.roles.map((r) => (
+                      <span key={r.id} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                        {r.display_name_ar || r.name}
+                      </span>
+                    )) : (
+                      <span className="text-[10px] text-rose-400">بدون دور — الصلاحيات الفردية فقط</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 text-[11px]">
+                    <span className="text-emerald-400 font-mono">{permData.effective_count}/{permData.total_permissions}</span>
+                    <span className="text-slate-500">صلاحية مفعّلة</span>
+                    <span className="text-indigo-300 font-mono">{Object.keys(permOverrides).length}</span>
+                    <span className="text-slate-500">استثناء فردي</span>
+                  </div>
+                  <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                    <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                      السحب الصريح يتغلب على صلاحية الدور. "موروثة" تعني إزالة الاستثناء والرجوع لصلاحيات الأدوار.
+                      تعديل الصلاحيات الفردية يُسجَّل في سجل التدقيق.
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <Search className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={permSearch}
+                        onChange={(e) => setPermSearch(e.target.value)}
+                        placeholder="ابحث باسم الصلاحية أو رمزها..."
+                        className="w-full bg-[#070d1a] border border-slate-800 rounded-xl pr-9 pl-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPermOnlyOverrides((v) => !v)}
+                      className={`px-3 py-2 rounded-xl text-[11px] font-semibold border transition cursor-pointer shrink-0 ${
+                        permOnlyOverrides
+                          ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                      }`}
+                    >
+                      الاستثناءات فقط
+                    </button>
+                  </div>
+                </div>
+
+                {/* Modules */}
+                <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-3">
+                  {permModules.length === 0 ? (
+                    <div className="p-10 text-center text-slate-500 text-sm">لا توجد صلاحيات مطابقة.</div>
+                  ) : permModules.map((module) => {
+                    const isCollapsed = Boolean(permCollapsed[module.key]);
+                    const moduleOverrides = module.permissions.filter((p) => permOverrides[p.id]).length;
+
+                    return (
+                      <div key={module.key} className="rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => togglePermModule(module.key)}
+                          className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-slate-950/50 hover:bg-slate-900/70 transition cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {isCollapsed ? (
+                              <ChevronRight className="w-4 h-4 text-slate-400 rotate-180 shrink-0" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                            )}
+                            <span className="text-sm font-bold text-slate-100 truncate">{module.label_ar}</span>
+                            <span className="text-[10px] text-slate-500 shrink-0">
+                              {module.filteredPermissions.length}/{module.total_count}
+                            </span>
+                            {moduleOverrides > 0 && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 shrink-0">
+                                {moduleOverrides} استثناء
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-500 shrink-0">
+                            مفعّل {module.effective_count}/{module.total_count}
+                          </span>
+                        </button>
+
+                        {!isCollapsed && (
+                          <div className="p-3 space-y-2">
+                            {module.filteredPermissions.map((perm) => {
+                              const override = permOverrides[perm.id] || null;
+                              const effectiveNow = permData.is_super_admin
+                                || (override ? override === 'grant' : perm.inherited);
+
+                              return (
+                                <div
+                                  key={perm.id}
+                                  className="p-3 rounded-xl border border-slate-800 bg-slate-950/40 flex flex-col sm:flex-row sm:items-center gap-3"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className={`w-2 h-2 rounded-full shrink-0 ${effectiveNow ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                                      <span className="text-xs font-bold text-slate-100">
+                                        {perm.display_name_ar || perm.display_name}
+                                      </span>
+                                      <RiskPill level={perm.risk_level} />
+                                      {override === 'deny' ? (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/30">مسحوب</span>
+                                      ) : override === 'grant' ? (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">منح خاص</span>
+                                      ) : perm.inherited ? (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">من الدور</span>
+                                      ) : (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-600 border border-slate-800">غير ممنوحة</span>
+                                      )}
+                                    </div>
+                                    <div className="font-mono text-[10px] text-slate-500 truncate mt-1" dir="ltr">
+                                      {perm.name}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded-lg p-0.5 shrink-0 self-start sm:self-auto">
+                                    {[
+                                      { value: null, label: 'موروثة' },
+                                      { value: 'grant', label: 'منح' },
+                                      { value: 'deny', label: 'سحب' },
+                                    ].map((option) => {
+                                      const active = override === option.value;
+                                      const activeClass = option.value === 'deny'
+                                        ? 'bg-rose-600 text-white'
+                                        : option.value === 'grant'
+                                          ? 'bg-indigo-600 text-white'
+                                          : 'bg-slate-700 text-white';
+
+                                      return (
+                                        <button
+                                          key={option.label}
+                                          type="button"
+                                          onClick={() => setOverride(perm.id, option.value)}
+                                          className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition cursor-pointer ${
+                                            active ? activeClass : 'text-slate-400 hover:text-slate-200'
+                                          }`}
+                                        >
+                                          {option.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Footer */}
+                <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-t border-slate-800 shrink-0 bg-[#0c1427]">
+                  <span className="text-[11px] text-slate-500">
+                    {Object.keys(permOverrides).length} استثناء سيُحفظ
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPermOverrides({})}
+                      disabled={permSaving}
+                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition cursor-pointer disabled:opacity-50"
+                    >
+                      مسح الاستثناءات
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPermUser(null)}
+                      disabled={permSaving}
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition cursor-pointer disabled:opacity-50"
+                    >
+                      إلغاء
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSavePermissions}
+                      disabled={permSaving}
+                      className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-lg shadow-indigo-600/20 disabled:opacity-50 cursor-pointer"
+                    >
+                      {permSaving ? 'جاري الحفظ...' : 'حفظ الصلاحيات'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
+  );
+}
+
+const RISK_STYLES = {
+  normal: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
+  warning: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+  critical: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+};
+
+const RISK_LABELS = { normal: 'عادي', warning: 'حساس', critical: 'حرج' };
+
+function RiskPill({ level }) {
+  const key = RISK_STYLES[level] ? level : 'normal';
+  return (
+    <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold shrink-0 ${RISK_STYLES[key]}`}>
+      {RISK_LABELS[key]}
+    </span>
   );
 }

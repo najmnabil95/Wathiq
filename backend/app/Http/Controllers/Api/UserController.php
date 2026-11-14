@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Permission;
 use App\Models\User;
 use App\Models\Role;
 use App\Services\AuditService;
@@ -20,6 +21,7 @@ class UserController extends Controller
         $this->checkPermission('users.view');
 
         $users = User::with(['roles', 'department'])
+            ->withCount('permissionOverrides')
             ->when($request->input('department_id'), fn($q, $v) => $q->where('department_id', $v))
             ->when($request->input('status'), fn($q, $v) => $q->where('status', $v))
             ->when($request->input('q'), fn($q, $v) => $q->where(function ($qq) use ($v) {
@@ -39,7 +41,7 @@ class UserController extends Controller
 
         return response()->json([
             'success' => true,
-            'data'    => User::with(['roles.permissions', 'department'])->findOrFail($id),
+            'data'    => User::with(['roles.permissions', 'department', 'permissionOverrides'])->findOrFail($id),
         ]);
     }
 
@@ -84,7 +86,7 @@ class UserController extends Controller
             'username'        => ['required', 'string', 'max:50', 'unique:users,username'],
             'email'           => ['required', 'email', 'unique:users,email'],
             'employee_number' => ['nullable', 'string', 'max:50', 'unique:users,employee_number'],
-            'department_id'   => ['nullable', 'exists:departments,id'],
+            'department_id'   => ['required', 'exists:departments,id'],
             'password'        => ['required', 'string', 'min:8', 'confirmed'],
             'phone'           => ['nullable', 'string', 'max:30'],
             'status'          => ['sometimes', 'in:active,inactive'],
@@ -127,7 +129,7 @@ class UserController extends Controller
             'username'        => ['sometimes', 'string', 'max:50', Rule::unique('users', 'username')->ignore($id)],
             'email'           => ['sometimes', 'email', Rule::unique('users', 'email')->ignore($id)],
             'employee_number' => ['nullable', 'string', 'max:50', Rule::unique('users', 'employee_number')->ignore($id)],
-            'department_id'   => ['nullable', 'exists:departments,id'],
+            'department_id'   => ['sometimes', 'required', 'exists:departments,id'],
             'phone'           => ['nullable', 'string', 'max:30'],
             'status'          => ['sometimes', 'in:active,inactive,suspended'],
             'password'        => ['nullable', 'string', 'min:8', 'confirmed'],
@@ -189,6 +191,154 @@ class UserController extends Controller
         $this->auditService->log('update', $user, null, ['roles' => $validated['roles']], "Roles updated for: {$user->name}");
 
         return response()->json(['success' => true, 'data' => $user->load('roles'), 'message' => 'تم تحديث الأدوار.']);
+    }
+
+    /**
+     * GET /api/v1/users/{id}/permissions
+     * Full permission tree annotated with role inheritance and per-user overrides.
+     */
+    public function permissions(Request $request, int $id): JsonResponse
+    {
+        $this->checkAnyPermission(['roles.assign', 'roles.manage']);
+
+        $user = User::with(['roles.permissions', 'permissionOverrides'])->findOrFail($id);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $this->buildPermissionMatrix($user),
+        ]);
+    }
+
+    /**
+     * PUT /api/v1/users/{id}/permissions
+     * Replace the user's per-user exceptions (grant / deny) over role bundles.
+     */
+    public function updatePermissions(Request $request, int $id): JsonResponse
+    {
+        $this->checkAnyPermission(['roles.assign', 'roles.manage']);
+
+        $user = User::with('permissionOverrides')->findOrFail($id);
+
+        if ($user->isSuperAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'مدير النظام الكامل يمتلك جميع الصلاحيات ولا يمكن تقييدها باستثناءات فردية.',
+            ], 422);
+        }
+
+        if ($request->user()->id === $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'لا يمكنك تعديل صلاحياتك الفردية بنفسك. اطلب من مدير نظام آخر.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'overrides'                 => ['present', 'array'],
+            'overrides.*.permission_id' => ['required', 'integer', 'exists:permissions,id'],
+            'overrides.*.effect'        => ['required', 'in:grant,deny'],
+        ]);
+
+        $sync = [];
+        foreach ($validated['overrides'] as $override) {
+            $sync[$override['permission_id']] = ['effect' => $override['effect']];
+        }
+
+        $old = $user->permissionOverrides
+            ->mapWithKeys(fn ($p) => [$p->name => $p->pivot->effect])
+            ->all();
+
+        $user->permissionOverrides()->sync($sync);
+
+        $new = $user->permissionOverrides()
+            ->get()
+            ->mapWithKeys(fn ($p) => [$p->name => $p->pivot->effect])
+            ->all();
+
+        $this->auditService->log(
+            'permission.override',
+            $user,
+            ['overrides' => $old],
+            ['overrides' => $new],
+            "تحديث الصلاحيات الفردية للمستخدم: {$user->name}"
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم تحديث الصلاحيات الفردية للمستخدم بنجاح.',
+            'data'    => $this->buildPermissionMatrix(
+                $user->fresh(['roles.permissions', 'permissionOverrides'])
+            ),
+        ]);
+    }
+
+    private function buildPermissionMatrix(User $user): array
+    {
+        $isSuperAdmin = $user->isSuperAdmin();
+        $overrides    = $user->permissionOverrides->mapWithKeys(
+            fn ($p) => [$p->id => $p->pivot->effect]
+        );
+
+        $modules = Permission::orderBy('group')->orderBy('id')->get()
+            ->groupBy('group')
+            ->map(function ($perms, $groupKey) use ($user, $isSuperAdmin, $overrides) {
+                $meta = RoleController::MODULE_METADATA[$groupKey] ?? [
+                    'label_ar'       => $groupKey,
+                    'label_en'       => ucfirst(str_replace('-', ' ', $groupKey)),
+                    'icon'           => 'Folder',
+                    'description_ar' => '',
+                ];
+
+                $items = $perms->map(function ($perm) use ($user, $isSuperAdmin, $overrides) {
+                    $effect    = $overrides[$perm->id] ?? null;
+                    $inherited = $user->hasRolePermission($perm->name);
+                    $effective = $isSuperAdmin ? true : ($effect !== null ? $effect === 'grant' : $inherited);
+
+                    return [
+                        'id'              => $perm->id,
+                        'name'            => $perm->name,
+                        'display_name'    => $perm->display_name,
+                        'display_name_ar' => $perm->display_name_ar,
+                        'description_ar'  => $perm->description_ar,
+                        'subgroup'        => $perm->subgroup ?? 'general',
+                        'risk_level'      => $perm->risk_level ?? 'normal',
+                        'standard_ref'    => $perm->standard_ref,
+                        'inherited'       => $inherited,
+                        'override'        => $effect,
+                        'effective'       => $effective,
+                    ];
+                });
+
+                return [
+                    'key'             => $groupKey,
+                    'label_ar'        => $meta['label_ar'],
+                    'label_en'        => $meta['label_en'],
+                    'icon'            => $meta['icon'],
+                    'description_ar'  => $meta['description_ar'],
+                    'total_count'     => $items->count(),
+                    'effective_count' => $items->where('effective', true)->count(),
+                    'override_count'  => $items->whereNotNull('override')->count(),
+                    'permissions'     => $items->values(),
+                ];
+            })->values();
+
+        return [
+            'user' => [
+                'id'       => $user->id,
+                'name'     => $user->name,
+                'username' => $user->username,
+                'roles'    => $user->roles->map(fn ($r) => [
+                    'id'              => $r->id,
+                    'name'            => $r->name,
+                    'display_name_ar' => $r->display_name_ar,
+                ])->values(),
+            ],
+            'is_super_admin'    => $isSuperAdmin,
+            'total_permissions' => $modules->sum('total_count'),
+            'effective_count'   => $modules->sum('effective_count'),
+            'override_count'    => $modules->sum('override_count'),
+            'modules'           => $modules,
+        ];
     }
 
     public function changeStatus(Request $request, int $id): JsonResponse

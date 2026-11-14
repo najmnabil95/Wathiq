@@ -159,4 +159,32 @@ class UserManagementTest extends TestCase
             ->putJson("/api/v1/users/{$superAdmin->id}/status", ['status' => 'inactive'])
             ->assertStatus(422);
     }
+
+    public function test_user_creation_requires_department(): void
+    {
+        $this->seed();
+
+        $admin = User::whereHas('roles', fn ($q) => $q->where('name', 'super_admin'))->firstOrFail();
+
+        $payload = [
+            'name'                  => 'No Department User',
+            'username'              => 'no_dept_' . uniqid(),
+            'email'                 => 'no_dept_' . uniqid() . '@edms.local',
+            'password'              => 'Secret@12345',
+            'password_confirmation' => 'Secret@12345',
+        ];
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/v1/users', $payload)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('department_id');
+
+        $this->assertDatabaseMissing('users', ['username' => $payload['username']]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/v1/users', $payload + ['department_id' => Department::firstOrFail()->id])
+            ->assertCreated();
+
+        $this->assertDatabaseHas('users', ['username' => $payload['username']]);
+    }
 }

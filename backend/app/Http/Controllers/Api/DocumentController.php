@@ -9,6 +9,7 @@ use App\Models\DocumentFieldValue;
 use App\Models\DocumentType;
 use App\Models\Setting;
 use App\Models\Status;
+use App\Services\ApprovalRoutingService;
 use App\Services\AuditService;
 use App\Services\DocumentNumberService;
 use App\Services\NotificationService;
@@ -24,6 +25,7 @@ class DocumentController extends Controller
         private readonly DocumentNumberService $numberService,
         private readonly AuditService          $auditService,
         private readonly NotificationService   $notificationService,
+        private readonly ApprovalRoutingService $approvalRouting,
     ) {}
 
     // ─── Index — List with filters & pagination ───────────────────
@@ -213,10 +215,21 @@ class DocumentController extends Controller
 
         $this->auditService->log('create', $document, null, $document->toArray(), "Document created: {$document->document_number}");
 
+        $canSubmit = $request->user()->hasPermission('workflows.submit');
+        $approval  = $this->approvalRouting->autoSubmit($document, $request->user());
+
+        $message = "تم إنشاء الوثيقة بنجاح. رقم الوثيقة: {$document->document_number}";
+        if ($approval) {
+            $message .= " وأُحيلت تلقائيًا لاعتماد {$approval->approver->name}.";
+        } elseif ($canSubmit) {
+            $message .= ' لم يُعثر على مدير قسم لاعتمادها تلقائيًا؛ يمكنك إرسالها للاعتماد يدويًا.';
+        }
+
         return response()->json([
-            'success' => true,
-            'message' => "تم إنشاء الوثيقة بنجاح. رقم الوثيقة: {$document->document_number}",
-            'data'    => $document->load(['documentType', 'category', 'status', 'confidentialityLevel']),
+            'success'     => true,
+            'message'     => $message,
+            'auto_routed' => $approval !== null,
+            'data'        => $document->load(['documentType', 'category', 'status', 'confidentialityLevel']),
         ], 201);
     }
 

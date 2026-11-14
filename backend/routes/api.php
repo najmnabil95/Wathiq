@@ -156,6 +156,8 @@ Route::prefix('v1')->middleware(['auth:sanctum'])->group(function () {
     Route::put   ('/users/{id}/status',         [UserController::class, 'changeStatus']);
     Route::post  ('/users/{id}/reset-password', [UserController::class, 'resetPassword']);
     Route::put   ('/users/{id}/roles', [UserController::class, 'updateRoles']);
+    Route::get   ('/users/{id}/permissions', [UserController::class, 'permissions']);
+    Route::put   ('/users/{id}/permissions', [UserController::class, 'updatePermissions']);
 
     // Roles & Permissions Tree
     Route::get   ('/roles',            [RoleController::class, 'index']);

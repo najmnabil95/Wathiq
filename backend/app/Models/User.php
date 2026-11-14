@@ -49,6 +49,13 @@ class User extends Authenticatable
         return $this->belongsToMany(Role::class, 'role_user');
     }
 
+    public function permissionOverrides()
+    {
+        return $this->belongsToMany(Permission::class, 'permission_user')
+            ->withPivot('effect')
+            ->withTimestamps();
+    }
+
     public function createdDocuments()
     {
         return $this->hasMany(Document::class, 'created_by');
@@ -102,6 +109,7 @@ class User extends Authenticatable
 
     /**
      * Check if user has a specific permission (directly or via role).
+     * Explicit per-user overrides win over role bundles; deny always wins.
      */
     public function hasPermission(string $permission): bool
     {
@@ -109,6 +117,34 @@ class User extends Authenticatable
             return true;
         }
 
+        $override = $this->permissionOverrides->firstWhere('name', $permission);
+        if ($override) {
+            return $override->pivot->effect === 'grant';
+        }
+
+        foreach ($this->roles as $role) {
+            if ($role->permissions->contains('name', $permission)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Effective per-user exception for a permission: 'grant', 'deny', or null.
+     */
+    public function permissionOverrideEffect(string $permission): ?string
+    {
+        $override = $this->permissionOverrides->firstWhere('name', $permission);
+
+        return $override?->pivot->effect;
+    }
+
+    /**
+     * Whether the permission is granted by one of the user's roles (ignoring overrides).
+     */
+    public function hasRolePermission(string $permission): bool
+    {
         foreach ($this->roles as $role) {
             if ($role->permissions->contains('name', $permission)) {
                 return true;

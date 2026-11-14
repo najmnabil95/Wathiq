@@ -18,7 +18,7 @@ class RoleController extends Controller
     /**
      * Module definitions with Arabic labels and metadata
      */
-    private const MODULE_METADATA = [
+    public const MODULE_METADATA = [
         'documents' => [
             'label_ar'       => 'إدارة الوثائق والأرشيف',
             'label_en'       => 'Documents & Archiving',

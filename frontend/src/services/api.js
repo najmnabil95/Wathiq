@@ -149,6 +149,8 @@ export const usersAPI = {
   changeStatus:(id, data) => api.put(`/users/${id}/status`, data),
   resetPassword:(id, data) => api.post(`/users/${id}/reset-password`, data),
   updateRoles: (id, roles) => api.put(`/users/${id}/roles`, { roles }),
+  permissions:       (id) => api.get(`/users/${id}/permissions`),
+  updatePermissions: (id, overrides) => api.put(`/users/${id}/permissions`, { overrides }),
 };
 
 // ─── Roles & Permissions Tree ──────────────────────────────────

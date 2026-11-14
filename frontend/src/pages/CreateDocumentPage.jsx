@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { documentsAPI, categoriesAPI, documentTypesAPI, settingsAPI, organizationsAPI, departmentsAPI, attachmentsAPI } from '../services/api';
 import { useAuthStore } from '../store/authStore';
-import { ArrowRight, Save, Plus, X, Upload, FileText, AlertCircle, Loader2, Camera, ChevronDown } from 'lucide-react';
+import { ArrowRight, Save, Plus, X, Upload, FileText, AlertCircle, Loader2, Camera, ChevronDown, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DocumentScannerModal from '../components/common/DocumentScannerModal';
 
@@ -524,6 +524,11 @@ export default function CreateDocumentPage() {
               })()}
 
               {errors.department_id && <p className="form-error"><AlertCircle size={12}/>{errors.department_id}</p>}
+
+              <p className="mt-2 text-[11px] text-slate-400 flex items-center gap-1.5">
+                <ShieldCheck size={12} className="text-emerald-400 shrink-0" />
+                ستُرسل الوثيقة تلقائيًا لاعتماد مدير هذا القسم بعد الحفظ.
+              </p>
             </div>
           </div>
 

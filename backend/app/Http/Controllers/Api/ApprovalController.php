@@ -7,6 +7,7 @@ use App\Models\Approval;
 use App\Models\Document;
 use App\Models\Status;
 use App\Models\User;
+use App\Services\ApprovalRoutingService;
 use App\Services\AuditService;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +18,7 @@ class ApprovalController extends Controller
     public function __construct(
         private readonly AuditService $auditService,
         private readonly NotificationService $notificationService,
+        private readonly ApprovalRoutingService $approvalRouting,
     ) {}
 
     /**
@@ -101,47 +103,20 @@ class ApprovalController extends Controller
             $approver = User::findOrFail($validated['approver_id']);
         }
 
-        // Prevent duplicate pending approval for the same user on this document
-        $existingPending = Approval::where('document_id', $document->id)
-            ->where('approver_id', $approver->id)
-            ->where('status', 'pending')
-            ->exists();
-
-        if ($existingPending) {
+        if ($this->approvalRouting->hasPendingApprovalFor($document, $approver)) {
             return response()->json([
                 'success' => false,
                 'message' => 'يوجد بالفعل طلب اعتماد معلق لهذا المستخدم على هذه الوثيقة.',
             ], 422);
         }
 
-        $approval = Approval::create([
-            'document_id'      => $document->id,
-            'workflow_step_id' => $validated['workflow_step_id'] ?? null,
-            'approver_id'      => $approver->id,
-            'status'           => 'pending',
-            'comments'         => $validated['comments'] ?? null,
-        ]);
-
-        // Update document status to pending approval if exists
-        $pendingStatus = Status::where('name', 'pending_approval')->orWhere('name', 'under_review')->first();
-        if ($pendingStatus && $document->status?->name !== 'approved') {
-            $document->update(['status_id' => $pendingStatus->id]);
-        }
-
-        // Notify approver
-        $this->notificationService->notifyApprovalRequested($document, $approver, $request->user());
-
-        // Audit log
-        $this->auditService->log(
-            'approval_requested',
+        $approval = $this->approvalRouting->request(
             $document,
-            null,
-            [
-                'approver_id' => $approver->id,
-                'approver_name' => $approver->name,
-                'auto_routed' => $autoRouted,
-            ],
-            "Approval requested from {$approver->name} for document {$document->document_number}"
+            $approver,
+            $request->user(),
+            $autoRouted,
+            $validated['workflow_step_id'] ?? null,
+            $validated['comments'] ?? null,
         );
 
         $approval->load(['approver:id,name,email,avatar', 'workflowStep']);
