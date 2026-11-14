@@ -18,6 +18,9 @@
 
 # Laravel Storage & Cache
 **/storage/*.key
+**/storage/app/private/
+**/storage/app/attachments/
+**/storage/app/documents/
 **/storage/framework/cache/*
 **/storage/framework/sessions/*
 **/storage/framework/views/*
