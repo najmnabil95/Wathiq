@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('audit_logs', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('user_id')->nullable()->constrained()->restrictOnDelete();
             $table->string('action', 50);               // create, view, update, delete, download, upload, approve, reject, archive, restore, login, logout
             $table->string('auditable_type')->nullable(); // App\Models\Document
             $table->unsignedBigInteger('auditable_id')->nullable();
@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('ip_address', 45)->nullable();
             $table->text('user_agent')->nullable();
             $table->string('description')->nullable();   // Human-readable description
-            $table->timestamp('created_at');             // No updated_at — logs are immutable
+            $table->dateTime('created_at');              // DATETIME: MariaDB would add ON UPDATE to TIMESTAMP
 
             $table->index('user_id');
             $table->index(['auditable_type', 'auditable_id']);

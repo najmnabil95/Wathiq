@@ -54,7 +54,7 @@ class AuditIntegrityTest extends TestCase
     public function test_audit_entries_are_linked_into_a_valid_hash_chain(): void
     {
         $this->seed();
-        AuditLog::query()->delete();
+        DB::table('audit_logs')->delete();
 
         $auditor = $this->userWithRole('auditor');
         $service = app(AuditService::class);
@@ -82,7 +82,7 @@ class AuditIntegrityTest extends TestCase
     public function test_tampered_audit_entry_breaks_the_chain(): void
     {
         $this->seed();
-        AuditLog::query()->delete();
+        DB::table('audit_logs')->delete();
 
         $auditor = $this->userWithRole('auditor');
         $service = app(AuditService::class);
@@ -108,7 +108,7 @@ class AuditIntegrityTest extends TestCase
     public function test_legacy_entries_without_hash_do_not_invalidate_the_chain(): void
     {
         $this->seed();
-        AuditLog::query()->delete();
+        DB::table('audit_logs')->delete();
 
         $auditor = $this->userWithRole('auditor');
 
@@ -128,5 +128,37 @@ class AuditIntegrityTest extends TestCase
 
         $this->assertSame(1, $response->json('data.legacy_entries'));
         $this->assertSame(1, $response->json('data.verified_entries'));
+    }
+
+    public function test_audit_entry_cannot_be_updated_through_the_model(): void
+    {
+        $log = app(AuditService::class)->log('create', null, null, ['ref' => 1], 'Immutable entry');
+
+        $this->expectException(\RuntimeException::class);
+
+        $log->update(['description' => 'tampered']);
+    }
+
+    public function test_audit_entry_cannot_be_deleted_through_the_model(): void
+    {
+        $log = app(AuditService::class)->log('create', null, null, ['ref' => 1], 'Immutable entry');
+
+        $this->expectException(\RuntimeException::class);
+
+        $log->delete();
+    }
+
+    public function test_created_at_is_not_rewritten_by_a_raw_update(): void
+    {
+        if (DB::getDriverName() !== 'mysql') {
+            $this->markTestSkipped('MariaDB TIMESTAMP ON UPDATE behaviour is MySQL-specific.');
+        }
+
+        $log = app(AuditService::class)->log('create', null, null, ['ref' => 1], 'Immutable entry');
+        $createdAt = $log->created_at->format('Y-m-d H:i:s');
+
+        DB::table('audit_logs')->where('id', $log->id)->update(['ip_address' => '10.0.0.1']);
+
+        $this->assertSame($createdAt, DB::table('audit_logs')->where('id', $log->id)->value('created_at'));
     }
 }

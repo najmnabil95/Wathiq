@@ -12,6 +12,12 @@ class AuditLog extends Model
     // Audit logs are immutable — no updated_at
     public $timestamps = false;
 
+    protected static function booted(): void
+    {
+        static::updating(fn () => throw new \RuntimeException('Audit logs are append-only and cannot be modified.'));
+        static::deleting(fn () => throw new \RuntimeException('Audit logs are append-only and cannot be deleted.'));
+    }
+
     protected $fillable = [
         'user_id',
         'action',

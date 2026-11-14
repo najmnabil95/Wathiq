@@ -58,7 +58,6 @@ class AttachmentController extends Controller
                 if ($description && !empty($description)) {
                     $attachment->update(['description' => $description]);
                 }
-                $this->auditService->logDownload($document, $file->getClientOriginalName());
                 $uploaded[] = $attachment;
             } catch (\InvalidArgumentException $e) {
                 return response()->json([
@@ -196,6 +195,13 @@ class AttachmentController extends Controller
 
         $document   = Document::findVisibleOrFail($docId, $request->user());
         $attachment = DocumentAttachment::where('document_id', $docId)->findOrFail($attId);
+
+        if ($document->hasActiveLegalHold()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'لا يمكن حذف مرفق من وثيقة خاضعة للحجز القانوني (Legal Hold). يجب رفع الحجز أولاً.',
+            ], 422);
+        }
 
         $this->auditService->log('delete', $document, ['file' => $attachment->original_name], null);
         $this->attachmentService->delete($attachment);
