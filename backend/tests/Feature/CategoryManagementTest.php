@@ -127,6 +127,21 @@ class CategoryManagementTest extends TestCase
         $this->assertSame('Category EN_KEEP', $fresh->name);
     }
 
+    public function test_soft_deleted_category_cannot_be_selected_as_parent(): void
+    {
+        $admin = $this->admin();
+        $ghost = $this->category('GHOST');
+        $ghost->delete();
+
+        $child = $this->category('ORPHAN_TO_BE');
+
+        $this->actingAs($admin, 'sanctum')
+            ->putJson("/api/v1/categories/{$child->id}", ['parent_id' => $ghost->id])
+            ->assertStatus(422);
+
+        $this->assertNull($child->fresh()->parent_id);
+    }
+
     public function test_sort_order_is_appended_when_omitted(): void
     {
         $admin = $this->admin();

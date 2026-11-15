@@ -68,6 +68,55 @@ function CategoryIcon({ name, className }) {
   return <Icon className={className} />;
 }
 
+const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function useFocusTrap(ref, active, initialSelector) {
+  const restoreRef = useRef(null);
+
+  useEffect(() => {
+    if (!active || !ref.current) return undefined;
+
+    restoreRef.current = document.activeElement;
+    const root = ref.current;
+
+    const focusables = () => Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR))
+      .filter((el) => el.getClientRects().length > 0);
+
+    const initial = (initialSelector && root.querySelector(initialSelector)) || focusables()[0] || root;
+    initial.focus?.();
+
+    const onKeyDown = (event) => {
+      if (event.key !== 'Tab') return;
+
+      const items = focusables();
+      if (items.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const first = items[0];
+      const last = items[items.length - 1];
+      const outside = !root.contains(document.activeElement);
+
+      if (event.shiftKey && (outside || document.activeElement === first)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (outside || document.activeElement === last)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    root.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      root.removeEventListener('keydown', onKeyDown);
+      const restore = restoreRef.current;
+      if (restore && document.contains(restore)) restore.focus?.();
+    };
+  }, [active, ref, initialSelector]);
+}
+
 function buildTree(list) {
   const nodes = new Map(list.map((c) => [c.id, { ...c, children: [] }]));
   const roots = [];
@@ -115,6 +164,11 @@ export default function CategoriesPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const expandedInitialized = useRef(false);
+  const modalRef = useRef(null);
+  const deleteDialogRef = useRef(null);
+
+  useFocusTrap(modalRef, modalOpen, 'input[placeholder*="مثال: تعديلات"]');
+  useFocusTrap(deleteDialogRef, Boolean(deleteTarget));
 
   useEffect(() => {
     fetchCategories();
@@ -622,9 +676,11 @@ export default function CategoriesPage() {
           onClick={() => setModalOpen(false)}
         >
           <div
+            ref={modalRef}
             role="dialog"
             aria-modal="true"
             aria-label={editingCategory ? 'تعديل التصنيف الأرشيفي' : 'إضافة تصنيف أرشيفي جديد'}
+            tabIndex={-1}
             className="bg-[#0c1427] border border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh] overflow-hidden my-auto text-right"
             onClick={(e) => e.stopPropagation()}
           >
@@ -845,9 +901,11 @@ export default function CategoriesPage() {
           onClick={() => (deleting ? null : setDeleteTarget(null))}
         >
           <div
+            ref={deleteDialogRef}
             role="alertdialog"
             aria-modal="true"
             aria-label="تأكيد حذف التصنيف"
+            tabIndex={-1}
             className="bg-[#0c1427] border border-slate-800 rounded-3xl w-full max-w-sm shadow-2xl p-6 text-right"
             onClick={(e) => e.stopPropagation()}
           >
