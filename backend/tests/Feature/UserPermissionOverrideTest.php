@@ -198,4 +198,29 @@ class UserPermissionOverrideTest extends TestCase
             ])
             ->assertStatus(422);
     }
+
+    public function test_session_payload_applies_grant_and_deny_overrides(): void
+    {
+        $this->seed();
+
+        $user  = $this->makeUser('viewer');
+        $grant = Permission::where('name', 'reports.export')->firstOrFail();
+        $deny  = Permission::where('name', 'categories.view')->firstOrFail();
+
+        $user->permissionOverrides()->sync([
+            $grant->id => ['effect' => 'grant'],
+            $deny->id  => ['effect' => 'deny'],
+        ]);
+
+        $response = $this->postJson('/api/v1/auth/login', [
+            'email'    => $user->username,
+            'password' => 'Secret@12345',
+        ])->assertOk();
+
+        $permissions = $response->json('data.user.permissions');
+
+        $this->assertContains('reports.export', $permissions);
+        $this->assertNotContains('categories.view', $permissions);
+        $this->assertContains('documents.view', $permissions);
+    }
 }

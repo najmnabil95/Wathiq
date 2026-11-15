@@ -21,7 +21,7 @@ class AuthController extends Controller
      */
     public function login(LoginRequest $request): JsonResponse
     {
-        $user = User::with(['roles.permissions', 'department'])
+        $user = User::with(['roles.permissions', 'permissionOverrides', 'department'])
             ->where('email', $request->email)
             ->orWhere('username', $request->email) // support login by username too
             ->first();
@@ -89,7 +89,7 @@ class AuthController extends Controller
      */
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user()->load(['roles.permissions', 'department.organization']);
+        $user = $request->user()->load(['roles.permissions', 'permissionOverrides', 'department.organization']);
 
         return response()->json([
             'success' => true,
@@ -115,7 +115,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'تم تحديث الملف الشخصي بنجاح',
-            'data'    => $this->formatUser($user->fresh(['roles.permissions', 'department.organization'])),
+            'data'    => $this->formatUser($user->fresh(['roles.permissions', 'permissionOverrides', 'department.organization'])),
         ]);
     }
 
@@ -165,6 +165,12 @@ class AuthController extends Controller
         foreach ($user->roles as $role) {
             $permissions = $permissions->merge($role->permissions->pluck('name'));
         }
+
+        $overrides = $user->permissionOverrides;
+        $granted   = $overrides->where('pivot.effect', 'grant')->pluck('name');
+        $denied    = $overrides->where('pivot.effect', 'deny')->pluck('name');
+
+        $permissions = $permissions->merge($granted)->unique()->diff($denied)->values();
 
         return [
             'id'              => $user->id,

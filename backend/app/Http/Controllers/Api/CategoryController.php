@@ -15,10 +15,11 @@ class CategoryController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $categories = Category::with(['parent', 'children'])
+        $categories = Category::withCount(['documents', 'children', 'documentTypes'])
             ->when($request->boolean('active_only', false), fn ($q) => $q->active())
             ->when($request->input('parent_id') === 'null', fn ($q) => $q->roots())
             ->ordered()
+            ->orderBy('id')
             ->get();
 
         return response()->json(['success' => true, 'data' => $categories]);
@@ -53,6 +54,10 @@ class CategoryController extends Controller
             $validated['name'] = $validated['name_ar'];
         }
 
+        if (empty($validated['sort_order'])) {
+            $validated['sort_order'] = (int) Category::max('sort_order') + 1;
+        }
+
         $category = Category::create($validated);
 
         $this->auditService->log('create', $category, null, $validated, "Category created: {$category->name}");
@@ -85,6 +90,24 @@ class CategoryController extends Controller
             $validated['name'] = $validated['name_ar'];
         }
 
+        if (array_key_exists('parent_id', $validated) && $validated['parent_id'] !== null) {
+            $newParentId = (int) $validated['parent_id'];
+
+            if ($newParentId === $category->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'لا يمكن أن يكون التصنيف أبًا لنفسه.',
+                ], 422);
+            }
+
+            if ($this->isSelfOrDescendant($newParentId, $category->id)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'لا يمكن نقل التصنيف تحت أحد أبنائه؛ سيؤدي ذلك إلى حلقة في الشجرة.',
+                ], 422);
+            }
+        }
+
         [$old, $new] = $this->auditService->getDiff($category->fill($validated));
         $category->save();
 
@@ -113,10 +136,36 @@ class CategoryController extends Controller
             ], 422);
         }
 
+        if ($category->documentTypes()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'لا يمكن حذف التصنيف لأنه مرتبط بأنواع وثائق.',
+            ], 422);
+        }
+
         $this->auditService->log('delete', $category, $category->toArray(), null, "Category deleted: {$category->name}");
         $category->delete();
 
         return response()->json(['success' => true, 'message' => 'تم حذف التصنيف.']);
+    }
+
+    /**
+     * Walk up from $candidateId; true when $categoryId is on that chain.
+     */
+    private function isSelfOrDescendant(int $candidateId, int $categoryId): bool
+    {
+        $current = Category::find($candidateId);
+        $guard   = 0;
+
+        while ($current && $guard++ < 100) {
+            if ((int) $current->id === $categoryId) {
+                return true;
+            }
+
+            $current = $current->parent_id ? Category::find($current->parent_id) : null;
+        }
+
+        return false;
     }
 
     /**
