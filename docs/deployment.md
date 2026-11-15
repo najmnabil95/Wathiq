@@ -23,6 +23,17 @@ php artisan test                  # يجب أن ينجح قبل أي نشر
 - مستخدم قاعدة بيانات مخصص بأقل صلاحيات (لا تستخدم root)
 - Document Root يشير إلى `backend/public` **حصراً** (وليس `backend/`)
 
+### معاينة ملفات Office (اختياري لكن موصى به)
+
+تحويل Word/Excel/PowerPoint إلى PDF للمعاينة داخل المتصفح يعتمد على LibreOffice headless:
+
+- ثبّت LibreOffice على الخادم (Windows: `C:/Program Files/LibreOffice/program/soffice.exe`، Linux: حزمة `libreoffice`).
+- إن لم يكن في المسار الافتراضي اضبط `EDMS_SOFFICE_PATH` في `.env` ثم `php artisan config:cache`.
+- ثبّت خطوطاً عربية على الخادم (مثل Noto Naskh Arabic) وإلا ظهر النص العربي غير مقروء في الـ PDF المحوّل.
+- النسخ المحوّلة تُخزَّن في `backend/storage/framework/cache/office-previews` وعند حذفها تُعاد في أول معاينة تالية.
+- عند غياب LibreOffice أو فشل التحويل يعرض النظام رسالة ويقدّم التنزيل بدلاً من المعاينة.
+- مستخدم خدمة الويب يجب أن يملك صلاحية تنفيذ `soffice` والكتابة في `storage/framework/cache`.
+
 ---
 
 ## 2. إعداد البيئة
@@ -240,4 +251,5 @@ npm run build
 | 404 لكل API | `mod_rewrite`/`try_files` غير مضبوط أو Document Root خاطئ |
 | المرفقات 404 | `php artisan storage:link` ورابط `public/storage` |
 | فشل النسخ الاحتياطي | `EDMS_MYSQLDUMP` صحيح وإضافة `zip` مفعّلة |
+| ملفات Word/Excel لا تُعرض PDF | LibreOffice غير مثبت أو `EDMS_SOFFICE_PATH` خاطئ؛ راجع `storage/logs/laravel.log` |
 | تسجيل خروج متكرر | مدة `SANCTUM_EXPIRATION` قصيرة أو ساعة الخادم غير متزامنة |

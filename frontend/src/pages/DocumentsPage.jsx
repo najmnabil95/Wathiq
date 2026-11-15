@@ -79,6 +79,7 @@ export default function DocumentsPage() {
   const [quickPreviewBlobUrl, setQuickPreviewBlobUrl] = useState(null);
   const [previewBlobLoading, setPreviewBlobLoading] = useState(false);
   const [quickPreviewError, setQuickPreviewError] = useState(null);
+  const [quickPreviewConverted, setQuickPreviewConverted] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(1);
   const [previewRotation, setPreviewRotation] = useState(0);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -123,20 +124,25 @@ export default function DocumentsPage() {
     if (!att) return;
     setQuickPreviewAttachment(att);
     setQuickPreviewError(null);
+    setQuickPreviewConverted(false);
     setPreviewZoom(1);
     setPreviewRotation(0);
 
     const fileName = (att.file_name || att.original_name || '').toLowerCase();
-    const isOffice = /\.(docx?|xlsx?|pptx?|zip|rar)$/i.test(fileName) ||
+    const isArchive = /\.(zip|rar|7z)$/i.test(fileName);
+    const isOffice = /\.(docx?|xlsx?|pptx?|odt|ods|odp|rtf)$/i.test(fileName) ||
       (att.mime_type && (
         att.mime_type.includes('wordprocessingml') ||
         att.mime_type.includes('msword') ||
         att.mime_type.includes('spreadsheetml') ||
         att.mime_type.includes('excel') ||
-        att.mime_type.includes('presentationml')
+        att.mime_type.includes('presentationml') ||
+        att.mime_type.includes('officedocument') ||
+        att.mime_type.includes('opendocument') ||
+        att.mime_type.includes('rtf')
       ));
 
-    if (isOffice) {
+    if (isArchive) {
       if (quickPreviewBlobUrl) {
         window.URL.revokeObjectURL(quickPreviewBlobUrl);
         setQuickPreviewBlobUrl(null);
@@ -150,8 +156,11 @@ export default function DocumentsPage() {
       if (quickPreviewBlobUrl) {
         window.URL.revokeObjectURL(quickPreviewBlobUrl);
       }
-      const mime = res.headers?.['content-type'] || 'application/pdf';
+      const responseType = String(res.headers?.['content-type'] || '').toLowerCase();
+      const converted = isOffice && responseType.includes('pdf');
+      const mime = converted ? 'application/pdf' : (responseType || 'application/pdf');
       const url = window.URL.createObjectURL(new Blob([res.data], { type: mime }));
+      setQuickPreviewConverted(converted);
       setQuickPreviewBlobUrl(url);
     } catch (err) {
       console.error('Failed to preview attachment:', err);
@@ -181,6 +190,7 @@ export default function DocumentsPage() {
     setQuickPreviewFull(null);
     setQuickPreviewAttachment(null);
     setQuickPreviewError(null);
+    setQuickPreviewConverted(false);
   };
 
   const handleDownloadQuickAttachment = async (docId, att) => {
@@ -1790,6 +1800,11 @@ export default function DocumentsPage() {
                         ({Math.round(quickPreviewAttachment.file_size / 1024)} KB)
                       </span>
                     )}
+                    {quickPreviewConverted && (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap">
+                        PDF للمعاينة
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1.5">
@@ -1855,7 +1870,7 @@ export default function DocumentsPage() {
                   {quickPreviewLoading || previewBlobLoading ? (
                     <div className="flex flex-col items-center justify-center p-8 text-slate-400 gap-3">
                       <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                      <p className="text-xs font-medium">جاري تجهيز المعاينة المباشرة للمستند...</p>
+                      <p className="text-xs font-medium">جاري تجهيز معاينة المستند (قد يتطلب تحويل ملفات Office إلى PDF)...</p>
                     </div>
                   ) : quickPreviewError ? (
                     <div className="text-center p-6 max-w-md">
@@ -1894,20 +1909,17 @@ export default function DocumentsPage() {
                       )}
                     </div>
                   ) : quickPreviewAttachment && (
-                    /\.(docx?|xlsx?|pptx?|zip|rar)$/i.test(quickPreviewAttachment.file_name || quickPreviewAttachment.original_name || '') ||
+                    /\.(zip|rar|7z)$/i.test(quickPreviewAttachment.file_name || quickPreviewAttachment.original_name || '') ||
                     (quickPreviewAttachment.mime_type && (
-                      quickPreviewAttachment.mime_type.includes('wordprocessingml') ||
-                      quickPreviewAttachment.mime_type.includes('msword') ||
-                      quickPreviewAttachment.mime_type.includes('spreadsheetml') ||
-                      quickPreviewAttachment.mime_type.includes('excel') ||
-                      quickPreviewAttachment.mime_type.includes('presentationml')
+                      quickPreviewAttachment.mime_type.includes('zip') ||
+                      quickPreviewAttachment.mime_type.includes('rar')
                     ))
                   ) ? (
                     <div className="text-center p-8 max-w-md space-y-3">
                       <FileCheck className="w-14 h-14 text-blue-400 mx-auto" />
-                      <h4 className="text-sm font-bold text-white">مستند Office جاهز للاطلاع</h4>
+                      <h4 className="text-sm font-bold text-white">ملف مضغوط</h4>
                       <p className="text-xs text-slate-400">
-                        هذا الملف بصيغة مكتبية ({quickPreviewAttachment.original_name || quickPreviewAttachment.file_name}). يمكنك تنزيله ومراجعته على جهازك.
+                        هذا الملف بصيغة مضغوطة ({quickPreviewAttachment.original_name || quickPreviewAttachment.file_name}). نزّله وفك ضغطه على جهازك.
                       </p>
                       <button
                         type="button"

@@ -7,6 +7,7 @@ use App\Models\Document;
 use App\Models\DocumentAttachment;
 use App\Services\AttachmentService;
 use App\Services\AuditService;
+use App\Services\OfficePreviewService;
 use App\Services\WatermarkService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,9 +16,10 @@ use Illuminate\Support\Facades\Storage;
 class AttachmentController extends Controller
 {
     public function __construct(
-        private readonly AttachmentService $attachmentService,
-        private readonly AuditService      $auditService,
-        private readonly WatermarkService  $watermarkService,
+        private readonly AttachmentService    $attachmentService,
+        private readonly AuditService         $auditService,
+        private readonly WatermarkService     $watermarkService,
+        private readonly OfficePreviewService $officePreviewService,
     ) {}
 
     public function index(Request $request, int $id): JsonResponse
@@ -170,6 +172,21 @@ class AttachmentController extends Controller
         }
 
         if (!$attachment->is_previewable && !str_ends_with(strtolower($filePath), '.pdf')) {
+            if ($this->officePreviewService->isConvertible($this->officePreviewService->extensionFor($attachment))) {
+                $pdfPath = method_exists($disk, 'path')
+                    ? $this->officePreviewService->convertFor($attachment, $disk->path($filePath))
+                    : null;
+
+                if ($pdfPath) {
+                    return $this->streamConvertedPdf($pdfPath, $attachment);
+                }
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'تعذّر تجهيز نسخة PDF للعرض حالياً. يمكنك تنزيل الملف الأصلي ومراجعته على جهازك.',
+                ], 422);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'هذا النوع من الملفات مكتبي أو مضغوط ويتطلب التنزيل والتشغيل المكتبي.',
@@ -187,6 +204,27 @@ class AttachmentController extends Controller
             ->header('Content-Length', strlen($fileContents))
             ->header('Cache-Control', 'private, no-cache');
 
+    }
+
+    private function streamConvertedPdf(string $path, DocumentAttachment $attachment): mixed
+    {
+        $contents = @file_get_contents($path);
+        if ($contents === false) {
+            return response()->json([
+                'success' => false,
+                'message' => 'تعذّر تجهيز نسخة PDF للعرض حالياً. يمكنك تنزيل الملف الأصلي ومراجعته على جهازك.',
+            ], 422);
+        }
+
+        $baseName = pathinfo((string) $attachment->original_name, PATHINFO_FILENAME) ?: 'document';
+        $safeAscii = preg_replace('/[^\x20-\x7E]/', '_', $baseName) . '.pdf';
+        $encodedName = rawurlencode($baseName . '.pdf');
+
+        return response($contents, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$safeAscii}\"; filename*=UTF-8''{$encodedName}")
+            ->header('Content-Length', strlen($contents))
+            ->header('Cache-Control', 'private, no-cache');
     }
 
     public function destroy(Request $request, int $docId, int $attId): JsonResponse

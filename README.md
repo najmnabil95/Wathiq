@@ -67,6 +67,7 @@
 - MySQL/MariaDB + Eloquent
 - FPDF/FPDI لتوليد الاستمارات والعلامة المائية
 - Tesseract (اختياري) لاستخراج نص المرفقات والبحث فيها
+- LibreOffice (اختياري) لتحويل ملفات Office إلى PDF للمعاينة داخل المتصفح
 
 **الواجهة** (`frontend/`)
 
@@ -185,6 +186,8 @@ npm run build        # من الجذر: يستدعي build الواجهة
 | `EDMS_BACKUP_KEEP` | `14` | عدد الأرشيفات المحفوظة |
 | `EDMS_MYSQLDUMP` | `C:/xampp/mysql/bin/mysqldump.exe` | مسار أداة التصدير |
 | `TESSERACT_PATH` | — | مسار `tesseract` لاستخراج النص (اختياري) |
+| `EDMS_SOFFICE_PATH` | — | مسار `soffice` لتحويل Office إلى PDF (اختياري؛ يُكتشف تلقائياً عند التثبيت) |
+| `EDMS_OFFICE_TIMEOUT` | `120` | مهلة تحويل Office→PDF بالثواني |
 | `ADMIN_NAME/EMAIL/USERNAME/PASSWORD` | قيم افتراضية في Seeder | حساب المدير الأول عند `migrate --seed` |
 | `DEMO_PASSWORD` | قيمة افتراضية في Seeder | كلمة مرور الحسابات التجريبية |
 | `FRONTEND_URL` | `http://localhost:5173` | يُستخدم فقط عندما لا يوجد بناء SPA |
@@ -240,7 +243,8 @@ npm run build        # من الجذر: يستدعي build الواجهة
 ## 10. المرفقات والمعاينة والبحث
 
 - المرفقات تُخزَّن على قرص `public` الخاص، وتُحمَّل عبر مسارات API موثّقة (لا روابط مباشرة).
-- المعاينة داخل المتصفح تتم عبر Blob/Object URL مع رؤوس أمان — التفاصيل في [docs/document-preview-mechanism.md](docs/document-preview-mechanism.md).
+- معاينة داخل المتصفح تتم عبر Blob/Object URL مع رؤوس أمان — التفاصيل في [docs/document-preview-mechanism.md](docs/document-preview-mechanism.md).
+- ملفات Office (Word وExcel وPowerPoint وODF وRTF) تُحوَّل إلى PDF على الخادم عبر LibreOffice headless عند أول معاينة، وتُخزَّن النسخة الناتجة مؤقتاً في `storage/framework/cache/office-previews`. إذا لم يكن LibreOffice مثبتاً أو فشل التحويل يظهر خيار التنزيل. الملفات المضغوطة (zip/rar/7z) تبقى للتنزيل دائماً.
 - عالمة مائية تُضاف على الخلفية عند التحميل/التصدير عند تفعيل `watermark_downloads`.
 - فحص سلامة الملفات عبر بصمة SHA-256 (`attachments` + `records.verify_hash`).
 - OCR: `php artisan edms:ocr-index` يستخرج النص ويفهرس المرفقات، ويُدرج النص في البحث عبر `GET /api/v1/search`.
@@ -380,6 +384,7 @@ php artisan edms:backup --keep=30      # تخصيص الاحتفاظ
 | نسخ احتياطي فاشل | مسار `mysqldump` أو `zip` غير متاح | اضبط `EDMS_MYSQLDUMP` وتأكد من إضافة PHP zip |
 | تحذير شهادة HTTPS محلي | شهادة ذاتية التوقيع | استورد الشهادة في نظامك أو استخدم نطاقاً موثوقاً |
 | بحث لا يجد محتوى المرفقات | OCR لم يعمل | ثبّت Tesseract واضبط `TESSERACT_PATH` ثم `edms:ocr-index` |
+| ملفات Word/Excel لا تُعرض | LibreOffice غير مثبت | ثبّت LibreOffice أو اضبط `EDMS_SOFFICE_PATH`؛ وإلا يبقى التنزيل متاحاً |
 
 ---
 

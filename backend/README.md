@@ -48,6 +48,7 @@ app/
 │   ├── ApprovalRoutingService.php     # توجيه الاعتماد لمدير القسم
 │   ├── AttachmentService.php          # تخزين + SHA-256
 │   ├── TextExtractionService.php      # OCR واستخراج نص
+│   ├── OfficePreviewService.php       # تحويل Office→PDF (LibreOffice) مع كاش
 │   ├── WatermarkService.php           # علامة مائية على الخلفية
 │   └── NotificationService.php
 └── ...
@@ -99,6 +100,7 @@ app/
 
 - التخزين على قرص `public` عبر `AttachmentService` مع بصمة SHA-256.
 - التحميل/المعاينة تمرّ بمسارات API موثّقة، والعلامة المائية تُطبَّق عند تفعيل `watermark_downloads`.
+- ملفات Office القابلة للتحويل (doc/docx/odt/rtf/xls/xlsx/ods/ppt/pptx/odp) يحوّلها `OfficePreviewService` إلى PDF عند أول معاينة ويُخزّنها في `storage/framework/cache/office-previews` بمفتاح `id + checksum + updated_at`. عند تعذّر التحويل يعيد المسار `422` مع رسالة تنزيل.
 
 ### الاعتماد
 

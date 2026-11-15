@@ -330,6 +330,7 @@ export default function DocumentDetailPage() {
   const [previewBlobUrl, setPreviewBlobUrl] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(null);
+  const [previewConverted, setPreviewConverted] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(1);
   const [previewRotation, setPreviewRotation] = useState(0);
 
@@ -410,24 +411,29 @@ export default function DocumentDetailPage() {
     setPreviewZoom(1);
     setPreviewRotation(0);
     setPreviewError(null);
+    setPreviewConverted(false);
 
     if (previewBlobUrl) {
       window.URL.revokeObjectURL(previewBlobUrl);
       setPreviewBlobUrl(null);
     }
 
-    // Check if file is an Office / non-streamable document
+    // Office files are converted to PDF server-side; archives still require download
     const fileName = (att.file_name || att.original_name || '').toLowerCase();
-    const isOffice = /\.(docx?|xlsx?|pptx?|zip|rar)$/i.test(fileName) ||
+    const isArchive = /\.(zip|rar|7z)$/i.test(fileName);
+    const isOffice = /\.(docx?|xlsx?|pptx?|odt|ods|odp|rtf)$/i.test(fileName) ||
       (att.mime_type && (
         att.mime_type.includes('wordprocessingml') ||
         att.mime_type.includes('msword') ||
         att.mime_type.includes('spreadsheetml') ||
         att.mime_type.includes('excel') ||
-        att.mime_type.includes('presentationml')
+        att.mime_type.includes('presentationml') ||
+        att.mime_type.includes('officedocument') ||
+        att.mime_type.includes('opendocument') ||
+        att.mime_type.includes('rtf')
       ));
 
-    if (isOffice) {
+    if (isArchive) {
       setPreviewLoading(false);
       return;
     }
@@ -435,9 +441,12 @@ export default function DocumentDetailPage() {
     try {
       setPreviewLoading(true);
       const res = await attachmentsAPI.preview(id, att.id);
-      const mime = att.mime_type || res.headers?.['content-type'] || 'application/pdf';
-      const blob = new Blob([res.data], { type: mime });
+      const responseType = String(res.headers?.['content-type'] || '').toLowerCase();
+      const mime = att.mime_type || responseType || 'application/pdf';
+      const converted = isOffice && responseType.includes('pdf');
+      const blob = new Blob([res.data], { type: converted ? 'application/pdf' : mime });
       const url = window.URL.createObjectURL(blob);
+      setPreviewConverted(converted);
       setPreviewBlobUrl(url);
     } catch (err) {
       console.error('Failed to preview file:', err);
@@ -465,6 +474,7 @@ export default function DocumentDetailPage() {
       setPreviewBlobUrl(null);
     }
     setActivePreviewAttachment(null);
+    setPreviewConverted(false);
     setPreviewZoom(1);
     setPreviewRotation(0);
   };
@@ -2810,14 +2820,25 @@ export default function DocumentDetailPage() {
       {/* ── INTERACTIVE DOCUMENT VIEWER MODAL ───────────────────────── */}
 
       {(() => {
+        const activeName = (activePreviewAttachment?.file_name || activePreviewAttachment?.original_name || '').toLowerCase();
         const isOfficeAttachment = activePreviewAttachment && (
-          /\.(docx?|xlsx?|pptx?|zip|rar)$/i.test(activePreviewAttachment.file_name || activePreviewAttachment.original_name || '') ||
+          /\.(docx?|xlsx?|pptx?|odt|ods|odp|rtf)$/i.test(activeName) ||
           (activePreviewAttachment.mime_type && (
             activePreviewAttachment.mime_type.includes('wordprocessingml') ||
             activePreviewAttachment.mime_type.includes('msword') ||
             activePreviewAttachment.mime_type.includes('spreadsheetml') ||
             activePreviewAttachment.mime_type.includes('excel') ||
-            activePreviewAttachment.mime_type.includes('presentationml')
+            activePreviewAttachment.mime_type.includes('presentationml') ||
+            activePreviewAttachment.mime_type.includes('officedocument') ||
+            activePreviewAttachment.mime_type.includes('opendocument') ||
+            activePreviewAttachment.mime_type.includes('rtf')
+          ))
+        );
+        const isArchiveAttachment = activePreviewAttachment && (
+          /\.(zip|rar|7z)$/i.test(activeName) ||
+          (activePreviewAttachment.mime_type && (
+            activePreviewAttachment.mime_type.includes('zip') ||
+            activePreviewAttachment.mime_type.includes('rar')
           ))
         );
 
@@ -2847,10 +2868,15 @@ export default function DocumentDetailPage() {
                       {activePreviewAttachment ? (activePreviewAttachment.original_name || activePreviewAttachment.file_name) : document?.title}
                     </h3>
                   </div>
-                  <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                  <p className="text-[11px] text-slate-400 truncate mt-0.5 flex items-center gap-2">
                     {activePreviewAttachment
                       ? `حجم الملف: ${activePreviewAttachment.file_size ? `${(activePreviewAttachment.file_size / 1024).toFixed(1)} KB` : 'غير محدد'}`
                       : 'معاينة البطاقة الرقمية والبيانات الأرشيفية للوثيقة'}
+                    {previewConverted && (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap">
+                        نسخة PDF للمعاينة
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -2971,7 +2997,9 @@ export default function DocumentDetailPage() {
               {previewLoading ? (
                 <div className="flex flex-col items-center justify-center p-12 text-slate-400">
                   <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
-                  <p className="text-sm font-semibold text-white">جاري تحميل وتجهيز الملف للاستعراض...</p>
+                  <p className="text-sm font-semibold text-white">
+                    {isOfficeAttachment ? 'جاري تحويل الملف إلى PDF وتجهيزه للاستعراض...' : 'جاري تحميل وتجهيز الملف للاستعراض...'}
+                  </p>
                   <p className="text-xs text-slate-500 mt-1 font-mono">Streaming file content securely...</p>
                 </div>
               ) : previewError ? (
@@ -3001,15 +3029,15 @@ export default function DocumentDetailPage() {
                     </button>
                   </div>
                 </div>
-              ) : isOfficeAttachment ? (
-                /* Word / Excel / Archive files */
+              ) : isArchiveAttachment ? (
+                /* Compressed archives still require download */
                 <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl max-w-lg text-center shadow-2xl">
                   <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto mb-4">
                     <FileText className="w-8 h-8" />
                   </div>
                   <h4 className="text-base font-bold text-white mb-1.5">{activePreviewAttachment.original_name || activePreviewAttachment.file_name}</h4>
                   <p className="text-xs text-slate-400 mb-6">
-                    هذا الملف من نوع المستندات المكتبية. يمكنك تحميله وتشغيله مباشرة عبر التطبيقات المكتبية المعتمدة (Microsoft Office / LibreOffice).
+                    هذا الملف مضغوط ولا يمكن استعراضه داخل النظام. نزّله وفك ضغطه على جهازك.
                   </p>
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
                     <button
@@ -3031,7 +3059,7 @@ export default function DocumentDetailPage() {
                 </div>
               ) : activePreviewAttachment && previewBlobUrl ? (
                 /* PDF File */
-                (activePreviewAttachment.mime_type?.includes('pdf') || (activePreviewAttachment.file_name || activePreviewAttachment.original_name || '').toLowerCase().endsWith('.pdf')) ? (
+                (previewConverted || activePreviewAttachment.mime_type?.includes('pdf') || (activePreviewAttachment.file_name || activePreviewAttachment.original_name || '').toLowerCase().endsWith('.pdf')) ? (
                   <iframe
                     src={previewBlobUrl}
                     className="w-full h-full rounded-2xl border border-slate-800 bg-white shadow-2xl"
