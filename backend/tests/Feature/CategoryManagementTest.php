@@ -113,6 +113,20 @@ class CategoryManagementTest extends TestCase
         $this->assertSame($alpha->id, $beta->fresh()->parent_id);
     }
 
+    public function test_updating_arabic_name_leaves_english_name_untouched(): void
+    {
+        $admin = $this->admin();
+        $category = $this->category('EN_KEEP');
+
+        $this->actingAs($admin, 'sanctum')
+            ->putJson("/api/v1/categories/{$category->id}", ['name_ar' => 'اسم عربي محدّث'])
+            ->assertOk();
+
+        $fresh = $category->fresh();
+        $this->assertSame('اسم عربي محدّث', $fresh->name_ar);
+        $this->assertSame('Category EN_KEEP', $fresh->name);
+    }
+
     public function test_sort_order_is_appended_when_omitted(): void
     {
         $admin = $this->admin();

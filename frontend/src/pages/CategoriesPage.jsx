@@ -274,7 +274,6 @@ export default function CategoriesPage() {
     }
 
     const payload = {
-      name: formData.name.trim(),
       name_ar: formData.name.trim(),
       description: formData.description.trim() || null,
       parent_id: formData.parent_id ? parseInt(formData.parent_id, 10) : null,
@@ -284,6 +283,7 @@ export default function CategoriesPage() {
     };
 
     if (!editingCategory) {
+      payload.name = formData.name.trim();
       payload.code = formData.code.trim() || `CAT-${Date.now().toString().slice(-4)}`;
     } else if (formData.code.trim()) {
       payload.code = formData.code.trim();
@@ -859,7 +859,7 @@ export default function CategoriesPage() {
                 <h3 className="text-base font-bold text-white">حذف التصنيف</h3>
                 <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                   هل أنت متأكد من حذف التصنيف «{deleteTarget.name_ar || deleteTarget.name}»؟
-                  لا يمكن التراجع عن هذا الإجراء.
+                  سيختفي من الواجهة فوراً، لكن يبقى سجله في قاعدة البيانات (حذف ناعم) ويمكن استرجاعه عند الحاجة.
                 </p>
               </div>
             </div>

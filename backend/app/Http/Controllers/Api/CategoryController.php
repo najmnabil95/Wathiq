@@ -33,7 +33,7 @@ class CategoryController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $this->authorize('categories.manage');
+        $this->ensurePermission('categories.manage');
 
         $validated = $request->validate([
             'code'        => ['required', 'string', 'max:30', 'unique:categories,code'],
@@ -67,7 +67,7 @@ class CategoryController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
-        $this->authorize('categories.manage');
+        $this->ensurePermission('categories.manage');
 
         $category = Category::findOrFail($id);
 
@@ -82,13 +82,6 @@ class CategoryController extends Controller
             'sort_order'  => ['nullable', 'integer'],
             'is_active'   => ['sometimes', 'boolean'],
         ]);
-
-        if (isset($validated['name']) && empty($validated['name_ar'])) {
-            $validated['name_ar'] = $validated['name'];
-        }
-        if (isset($validated['name_ar']) && empty($validated['name'])) {
-            $validated['name'] = $validated['name_ar'];
-        }
 
         if (array_key_exists('parent_id', $validated) && $validated['parent_id'] !== null) {
             $newParentId = (int) $validated['parent_id'];
@@ -118,7 +111,7 @@ class CategoryController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
-        $this->authorize('categories.manage');
+        $this->ensurePermission('categories.manage');
 
         $category = Category::findOrFail($id);
 
@@ -169,9 +162,9 @@ class CategoryController extends Controller
     }
 
     /**
-     * Helper: authorize by permission name.
+     * Helper: enforce a named permission.
      */
-    private function authorize(string $permission): void
+    private function ensurePermission(string $permission): void
     {
         if (!request()->user()->hasPermission($permission) && !request()->user()->isSuperAdmin()) {
             abort(403, 'ليس لديك صلاحية للقيام بهذه العملية.');
