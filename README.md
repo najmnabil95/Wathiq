@@ -187,7 +187,7 @@ npm run build        # من الجذر: يستدعي build الواجهة
 | `EDMS_MYSQLDUMP` | `C:/xampp/mysql/bin/mysqldump.exe` | مسار أداة التصدير |
 | `TESSERACT_PATH` | — | مسار `tesseract` لاستخراج النص (اختياري) |
 | `EDMS_SOFFICE_PATH` | — | مسار `soffice` لتحويل Office إلى PDF (اختياري؛ يُكتشف تلقائياً عند التثبيت) |
-| `EDMS_OFFICE_TIMEOUT` | `120` | مهلة تحويل Office→PDF بالثواني |
+| `EDMS_OFFICE_TIMEOUT` | `60` | مهلة تحويل Office→PDF بالثواني (يجب أن تبقى أقل من `max_execution_time` في PHP)
 | `ADMIN_NAME/EMAIL/USERNAME/PASSWORD` | قيم افتراضية في Seeder | حساب المدير الأول عند `migrate --seed` |
 | `DEMO_PASSWORD` | قيمة افتراضية في Seeder | كلمة مرور الحسابات التجريبية |
 | `FRONTEND_URL` | `http://localhost:5173` | يُستخدم فقط عندما لا يوجد بناء SPA |

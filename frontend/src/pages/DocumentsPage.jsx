@@ -221,6 +221,7 @@ export default function DocumentsPage() {
     q:                       searchParams.get('q') || '',
     category_id:             searchParams.get('category_id') || '',
     category_code:           searchParams.get('category_code') || '',
+    document_type_id:        searchParams.get('document_type_id') || '',
     department_id:           searchParams.get('department_id') || '',
     status:                  searchParams.get('status') || '',
     pending:                 searchParams.get('pending') === 'true',
@@ -242,6 +243,7 @@ export default function DocumentsPage() {
       q:                       searchParams.get('q') || '',
       category_id:             searchParams.get('category_id') || '',
       category_code:           searchParams.get('category_code') || '',
+      document_type_id:        searchParams.get('document_type_id') || '',
       department_id:           searchParams.get('department_id') || '',
       status:                  searchParams.get('status') || '',
       pending:                 searchParams.get('pending') === 'true',
@@ -293,6 +295,7 @@ export default function DocumentsPage() {
       if (!params.q) delete params.q;
       if (!params.category_id) delete params.category_id;
       if (!params.category_code) delete params.category_code;
+      if (!params.document_type_id) delete params.document_type_id;
       if (!params.department_id) delete params.department_id;
       if (!params.status) delete params.status;
       if (!params.pending) delete params.pending;
@@ -338,6 +341,7 @@ export default function DocumentsPage() {
       q: '',
       category_id: '',
       category_code: '',
+      document_type_id: '',
       department_id: '',
       status: '',
       pending: false,
@@ -354,6 +358,7 @@ export default function DocumentsPage() {
     filters.q ||
     filters.category_id ||
     filters.category_code ||
+    filters.document_type_id ||
     filters.department_id ||
     filters.status ||
     filters.pending ||

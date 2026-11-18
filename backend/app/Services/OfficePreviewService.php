@@ -81,14 +81,15 @@ class OfficePreviewService
                 '--norestore',
                 '--nolockcheck',
                 '--nodefault',
-                "--env:UserInstallation={$profileUri}",
+                "-env:UserInstallation={$profileUri}",
                 '--convert-to',
                 'pdf',
                 '--outdir',
                 $workDir,
                 $inputPath,
             ]);
-            $process->setTimeout((int) config('edms.office_timeout', 120));
+            $process->setTimeout((int) config('edms.office_timeout', 60));
+            $process->disableOutput();
             $process->run();
 
             $outputPath = $workDir.DIRECTORY_SEPARATOR.'input.pdf';
@@ -97,7 +98,6 @@ class OfficePreviewService
                 Log::warning('Office preview conversion failed.', [
                     'attachment_id' => $attachment->id,
                     'exit_code' => $process->getExitCode(),
-                    'error' => Str::limit(trim($process->getErrorOutput()), 500),
                 ]);
 
                 return null;
@@ -157,11 +157,13 @@ class OfficePreviewService
 
         $configured = trim((string) config('edms.soffice', ''));
         if ($configured !== '' && is_file($configured)) {
-            return $this->resolvedBinary = $configured;
+            return $this->resolvedBinary = $this->preferConsoleVariant($configured);
         }
 
         $candidates = [
+            'C:/Program Files/LibreOffice/program/soffice.com',
             'C:/Program Files/LibreOffice/program/soffice.exe',
+            'C:/Program Files (x86)/LibreOffice/program/soffice.com',
             'C:/Program Files (x86)/LibreOffice/program/soffice.exe',
             '/usr/bin/soffice',
             '/usr/local/bin/soffice',
@@ -171,7 +173,7 @@ class OfficePreviewService
 
         foreach ($candidates as $candidate) {
             if (is_file($candidate)) {
-                return $this->resolvedBinary = $candidate;
+                return $this->resolvedBinary = $this->preferConsoleVariant($candidate);
             }
         }
 
@@ -181,7 +183,7 @@ class OfficePreviewService
             if ($dir === '') {
                 continue;
             }
-            foreach (['soffice.exe', 'soffice'] as $name) {
+            foreach (['soffice.com', 'soffice.exe', 'soffice'] as $name) {
                 $candidate = rtrim($dir, '\\/').DIRECTORY_SEPARATOR.$name;
                 if (is_file($candidate)) {
                     return $this->resolvedBinary = $candidate;
@@ -190,5 +192,21 @@ class OfficePreviewService
         }
 
         return $this->resolvedBinary = null;
+    }
+
+    /**
+     * soffice.exe detaches from the process pipes on Windows and can hang the caller;
+     * soffice.com is the console launcher that waits for the conversion to finish.
+     */
+    private function preferConsoleVariant(string $binary): string
+    {
+        if (str_ends_with(strtolower($binary), '.exe')) {
+            $console = substr($binary, 0, -4).'.com';
+            if (is_file($console)) {
+                return $console;
+            }
+        }
+
+        return $binary;
     }
 }
