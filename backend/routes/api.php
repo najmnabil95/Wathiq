@@ -41,7 +41,7 @@ Route::get('/health', fn () => response()->json([
 // ─── Authentication Routes (Public) ────────────────────────────────────
 Route::prefix('v1/auth')->group(function () {
     Route::post('/login',  [AuthController::class, 'login'])
-         ->middleware('throttle:5,1'); // 5 attempts per minute
+         ->middleware('throttle:30,1'); // 30 attempts per minute
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout',   [AuthController::class, 'logout']);
