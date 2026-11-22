@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class DocumentAttachment extends Model
@@ -31,11 +33,17 @@ class DocumentAttachment extends Model
 
     // ─── Relationships ────────────────────────────────────────────
 
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
     public function document()
     {
         return $this->belongsTo(Document::class);
     }
 
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
     public function uploader()
     {
         return $this->belongsTo(User::class, 'uploaded_by');
@@ -101,11 +109,19 @@ class DocumentAttachment extends Model
 
     // ─── Scopes ───────────────────────────────────────────────────
 
+    /**
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
     public function scopeImages($query)
     {
         return $query->where('mime_type', 'LIKE', 'image/%');
     }
 
+    /**
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
     public function scopePdfs($query)
     {
         return $query->where('mime_type', 'application/pdf');
