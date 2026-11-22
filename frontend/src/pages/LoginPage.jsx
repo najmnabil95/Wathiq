@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { Eye, EyeOff, LogIn, Shield, Lock, Mail, AlertCircle, Fingerprint } from 'lucide-react';
+import { Eye, EyeOff, LogIn, Shield, Lock, Mail, AlertCircle, Fingerprint, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
@@ -64,6 +64,20 @@ export default function LoginPage() {
 
       {/* Login Card */}
       <div className="w-full max-w-[400px] animate-fade-in relative z-10">
+
+        {/* Back to Landing link */}
+        <div className="mb-4 flex items-center justify-between">
+          <Link
+            to="/landing"
+            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-blue-400 transition-colors"
+          >
+            <ArrowRight size={14} />
+            <span>العودة للصفحة التعريفية</span>
+          </Link>
+          <span className="text-[10px] font-mono text-slate-400 bg-white/[0.04] px-2 py-0.5 rounded border border-white/[0.06]">
+            IT-EDMS v2.0
+          </span>
+        </div>
 
         {/* Logo */}
         <div className="text-center mb-7">

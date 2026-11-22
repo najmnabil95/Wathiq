@@ -22,6 +22,7 @@ const ProfilePage        = lazy(() => import('./pages/ProfilePage'));
 const WorkflowsPage      = lazy(() => import('./pages/WorkflowsPage'));
 const DispositionPage    = lazy(() => import('./pages/DispositionPage'));
 const SystemFlowPage     = lazy(() => import('./pages/SystemFlowPage'));
+const LandingPage        = lazy(() => import('./pages/LandingPage'));
 
 // ── Loading Fallback ─────────────────────────────────────────────
 function PageLoader() {
@@ -39,7 +40,7 @@ import UnauthorizedPage from './components/common/UnauthorizedPage';
 function ProtectedRoute({ children }) {
   const { token, user } = useAuthStore();
   const isAuthenticated = Boolean(token && user && user.id);
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/landing" replace />;
   return children;
 }
 
@@ -73,7 +74,8 @@ export default function App() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
-        {/* Public */}
+        {/* Public Landing & Login */}
+        <Route path="/landing" element={<LandingPage />} />
         <Route path="/login" element={
           <PublicRoute><LoginPage /></PublicRoute>
         } />
