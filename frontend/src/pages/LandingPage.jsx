@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+-import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import {
@@ -269,7 +269,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen text-slate-100 selection:bg-blue-500/30 selection:text-blue-200 relative overflow-hidden" style={{ direction: 'rtl', fontFamily: 'var(--font-sans)' }}>
-      
+
       {/* ── Background Gradients & Noise ───────────────────────────── */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-0 right-1/4 w-[650px] h-[650px] rounded-full bg-blue-600/[0.07] blur-[140px]" />
@@ -290,15 +290,15 @@ export default function LandingPage() {
       {/* ── Navigation Header ────────────────────────────────────────── */}
       <header className="sticky top-0 z-50 backdrop-blur-xl border-b border-white/[0.07] bg-[#070b16]/80 transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
-          
+
           {/* Brand Logo */}
           <Link to="/" className="flex items-center gap-3.5 group">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center relative transition-transform duration-300 group-hover:scale-105"
-                 style={{
-                   background: 'linear-gradient(135deg, rgba(59,130,246,0.25), rgba(139,92,246,0.2))',
-                   border: '1px solid rgba(59,130,246,0.35)',
-                   boxShadow: '0 0 25px rgba(59,130,246,0.25), inset 0 1px 0 rgba(255,255,255,0.15)'
-                 }}>
+              style={{
+                background: 'linear-gradient(135deg, rgba(59,130,246,0.25), rgba(139,92,246,0.2))',
+                border: '1px solid rgba(59,130,246,0.35)',
+                boxShadow: '0 0 25px rgba(59,130,246,0.25), inset 0 1px 0 rgba(255,255,255,0.15)'
+              }}>
               <Shield size={24} className="text-blue-400 group-hover:rotate-6 transition-transform" />
             </div>
             <div>
@@ -356,7 +356,7 @@ export default function LandingPage() {
       {/* ── Hero Section ────────────────────────────────────────────── */}
       <section className="relative pt-12 pb-20 md:pt-20 md:pb-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto z-10">
         <div className="text-center max-w-4xl mx-auto">
-          
+
           {/* Top Pill Announcement */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/25 text-blue-300 text-xs font-semibold mb-6 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -431,13 +431,13 @@ export default function LandingPage() {
 
         {/* ── Interactive Live Document Showcase ─────────────────────── */}
         <div id="showcase" className="mt-16 sm:mt-24 max-w-5xl mx-auto relative scroll-mt-28">
-          
+
           {/* Subtle Outer Glow */}
           <div className="absolute -inset-1.5 rounded-3xl bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-emerald-500/20 blur-xl opacity-75 pointer-events-none" />
 
           {/* Showcase Container Window */}
           <div className="relative rounded-3xl bg-[#090e1d]/90 border border-white/[0.12] shadow-2xl overflow-hidden backdrop-blur-xl">
-            
+
             {/* Window Header */}
             <div className="px-6 py-4 border-b border-white/[0.08] bg-white/[0.02] flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -459,11 +459,10 @@ export default function LandingPage() {
                   <button
                     key={idx}
                     onClick={() => setActiveTab(idx)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      activeTab === idx
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === idx
                         ? 'bg-blue-600 text-white shadow-sm'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.05]'
-                    }`}
+                      }`}
                   >
                     نموذج #{idx + 1}
                   </button>
@@ -477,27 +476,25 @@ export default function LandingPage() {
                 const doc = sampleDocs[activeTab];
                 return (
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                    
+
                     {/* Left/Main Column: Document Card */}
                     <div className="lg:col-span-8 space-y-6">
-                      
+
                       {/* Top Badges */}
                       <div className="flex flex-wrap items-center gap-2.5">
                         <span className="font-mono text-xs font-bold px-3 py-1 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/25">
                           {doc.docNum}
                         </span>
-                        <span className={`text-xs font-bold px-2.5 py-0.5 rounded-md ${
-                          doc.statusColor === 'emerald' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' :
-                          doc.statusColor === 'amber' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25' :
-                          'bg-violet-500/10 text-violet-400 border border-violet-500/25'
-                        }`}>
+                        <span className={`text-xs font-bold px-2.5 py-0.5 rounded-md ${doc.statusColor === 'emerald' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' :
+                            doc.statusColor === 'amber' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25' :
+                              'bg-violet-500/10 text-violet-400 border border-violet-500/25'
+                          }`}>
                           ● {doc.status}
                         </span>
-                        <span className={`text-xs font-bold px-2.5 py-0.5 rounded-md ${
-                          doc.confColor === 'rose' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/25' :
-                          doc.confColor === 'amber' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25' :
-                          'bg-blue-500/10 text-blue-400 border border-blue-500/25'
-                        }`}>
+                        <span className={`text-xs font-bold px-2.5 py-0.5 rounded-md ${doc.confColor === 'rose' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/25' :
+                            doc.confColor === 'amber' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25' :
+                              'bg-blue-500/10 text-blue-400 border border-blue-500/25'
+                          }`}>
                           مستوى السرية: {doc.confidentiality}
                         </span>
                       </div>
@@ -551,7 +548,7 @@ export default function LandingPage() {
 
                     {/* Right Column: Physical & Thermal Barcode Sticker Preview */}
                     <div className="lg:col-span-4 p-5 rounded-2xl bg-gradient-to-b from-white/[0.04] to-white/[0.01] border border-white/[0.08] space-y-4">
-                      
+
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                           <QrCode size={16} className="text-blue-400" />
@@ -573,7 +570,7 @@ export default function LandingPage() {
                         {/* Simulated Barcode */}
                         <div className="py-2 px-3 bg-white rounded border border-slate-200 flex flex-col items-center">
                           <div className="h-10 w-full flex items-center justify-center gap-0.5">
-                            {[4,2,6,1,3,5,2,4,1,7,3,2,6,4,2,5,1,3,4,6,2,3,5,1,4,2,6].map((w, i) => (
+                            {[4, 2, 6, 1, 3, 5, 2, 4, 1, 7, 3, 2, 6, 4, 2, 5, 1, 3, 4, 6, 2, 3, 5, 1, 4, 2, 6].map((w, i) => (
                               <div
                                 key={i}
                                 className="bg-black h-full"
@@ -612,7 +609,7 @@ export default function LandingPage() {
 
       {/* ── Key Features Grid ────────────────────────────────────────── */}
       <section id="features" className="py-20 md:py-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto z-10 relative scroll-mt-20">
-        
+
         <div className="text-center max-w-3xl mx-auto mb-16">
           <span className="text-xs font-bold px-3.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/25">
             القدرات والمعمارية التقنية
@@ -660,7 +657,7 @@ export default function LandingPage() {
 
       {/* ── Interactive Document Lifecycle ──────────────────────────── */}
       <section id="lifecycle" className="py-20 md:py-28 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto z-10 relative scroll-mt-20">
-        
+
         <div className="text-center max-w-3xl mx-auto mb-16">
           <span className="text-xs font-bold px-3.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
             دورة حياة الوثيقة الرقمية
@@ -679,11 +676,10 @@ export default function LandingPage() {
             <button
               key={idx}
               onClick={() => setActiveLifecycle(idx)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-                activeLifecycle === idx
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeLifecycle === idx
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25 border border-blue-400/40 scale-105'
                   : 'bg-white/[0.03] text-slate-400 hover:text-slate-200 hover:bg-white/[0.06] border border-white/[0.06]'
-              }`}
+                }`}
             >
               <span className="font-mono text-xs opacity-75">{step.step}.</span>
               <span>{step.short}</span>
@@ -755,7 +751,7 @@ export default function LandingPage() {
 
       {/* ── Demo Accounts Section ───────────────────────────────────── */}
       <section id="demo" className="py-20 md:py-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto z-10 relative scroll-mt-20">
-        
+
         <div className="text-center max-w-3xl mx-auto mb-16">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/25 text-xs font-bold mb-4">
             <Sparkles size={14} />
@@ -846,7 +842,7 @@ export default function LandingPage() {
 
       {/* ── FAQ Section ─────────────────────────────────────────────── */}
       <section id="faq" className="py-20 md:py-28 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto z-10 relative scroll-mt-20">
-        
+
         <div className="text-center mb-14">
           <span className="text-xs font-bold px-3.5 py-1 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/25">
             الأسئلة الشائعة
@@ -872,9 +868,8 @@ export default function LandingPage() {
                 <span>{faq.q}</span>
                 <ChevronDown
                   size={18}
-                  className={`text-slate-400 transition-transform duration-300 shrink-0 ${
-                    openFaq === idx ? 'rotate-180 text-blue-400' : ''
-                  }`}
+                  className={`text-slate-400 transition-transform duration-300 shrink-0 ${openFaq === idx ? 'rotate-180 text-blue-400' : ''
+                    }`}
                 />
               </button>
 
@@ -891,7 +886,7 @@ export default function LandingPage() {
       {/* ── CTA Banner ──────────────────────────────────────────────── */}
       <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto z-10 relative">
         <div className="rounded-3xl p-8 sm:p-12 bg-gradient-to-r from-blue-600/30 via-indigo-600/30 to-purple-600/30 border border-blue-500/30 backdrop-blur-2xl text-center relative overflow-hidden shadow-2xl">
-          
+
           <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
 
@@ -925,7 +920,7 @@ export default function LandingPage() {
       {/* ── Footer ─────────────────────────────────────────────────── */}
       <footer className="border-t border-white/[0.08] bg-[#050810]/95 py-12 px-4 sm:px-6 lg:px-8 text-xs text-slate-400 z-10 relative">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          
+
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center text-blue-400 font-bold">
               <Shield size={18} />

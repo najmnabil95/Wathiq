@@ -1,0 +1,822 @@
+/* ============================================================
+   RTL + Arabic typography
+   The whole product now runs in Arabic, right to left.
+   ============================================================ */
+
+html[dir='rtl'] * {
+  letter-spacing: 0 !important;
+}
+
+html[dir='rtl'] body {
+  direction: rtl;
+  font-family: var(--font);
+  line-height: 1.6;
+}
+
+html[dir='rtl'] h1,
+html[dir='rtl'] h2,
+html[dir='rtl'] h3,
+html[dir='rtl'] h4 {
+  line-height: 1.35;
+}
+
+/* ---------- shell & sidebar ---------- */
+html[dir='rtl'] .sidebar {
+  transition: none;
+  inset: 0 0 0 auto;
+  border-width: 0 0 0 1px;
+  border-radius: 26px 0 0 26px;
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.035), -22px 0 60px rgba(0, 0, 0, 0.18);
+}
+
+html[dir='rtl'][data-theme='light'] .sidebar {
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.6), -20px 0 50px rgba(31, 50, 80, 0.06);
+}
+
+html[dir='rtl'] .main-wrap {
+  margin-left: 0;
+  margin-right: var(--sidebar-w);
+  transition: none;
+}
+
+html[dir='rtl'] .app-shell.is-ready .sidebar {
+  transition: width 0.42s var(--ease), transform 0.42s var(--ease);
+}
+
+html[dir='rtl'] .app-shell.is-ready .main-wrap {
+  transition: margin-right 0.42s var(--ease);
+}
+
+html[dir='rtl'] .side-search-label {
+  text-align: start;
+}
+
+html[dir='rtl'] .nav-badge,
+html[dir='rtl'] .side-user-out {
+  margin-left: 0;
+  margin-inline-start: auto;
+}
+
+html[dir='rtl'] .topbar-actions {
+  margin-left: 0;
+  margin-inline-start: auto;
+}
+
+html[dir='rtl'] .create-btn {
+  margin-left: 0;
+  margin-inline-start: 0;
+}
+
+html[dir='rtl'] .icon-badge {
+  right: auto;
+  left: -4px;
+}
+
+html[dir='rtl'] .bell-pop {
+  right: auto;
+  left: 0;
+}
+
+html[dir='rtl'] .bell-list {
+  direction: rtl;
+}
+
+html[dir='rtl'] .toasts {
+  right: auto;
+  left: 22px;
+}
+
+html[dir='rtl'] .palette-keys {
+  margin-left: 0;
+  margin-inline-start: auto;
+}
+
+html[dir='rtl'] .palette-quick {
+  direction: rtl;
+}
+
+html[dir='rtl'] .main,
+html[dir='rtl'] .topbar {
+  text-align: start;
+}
+
+/* ---------- cards & stats ---------- */
+html[dir='rtl'] .stat-cell {
+  border-left: 0;
+  border-inline-start: 1px solid var(--line);
+}
+
+html[dir='rtl'] .stat-cell:first-child {
+  border-inline-start: 0;
+}
+
+html[dir='rtl'] .stat-spark {
+  border-left: 0;
+  border-inline-start: 1px solid var(--line);
+  padding: 0 0 0 14px;
+}
+
+html[dir='rtl'] .stat-foot {
+  flex-wrap: wrap;
+}
+
+html[dir='rtl'] .goal-rows dd {
+  text-align: left;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+html[dir='rtl'] .goal-of {
+  unicode-bidi: isolate;
+}
+
+html[dir='rtl'] .source-share,
+html[dir='rtl'] .source-value {
+  text-align: left;
+}
+
+html[dir='rtl'] .source-value {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+html[dir='rtl'] .delta-up {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+html[dir='rtl'] .goal-pct {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* ---------- buttons, tables, badges ---------- */
+html[dir='rtl'] .btn,
+html[dir='rtl'] .ghost-action {
+  direction: rtl;
+}
+
+html[dir='rtl'] .data-table {
+  text-align: right;
+}
+
+html[dir='rtl'] .row-action {
+  text-align: left;
+}
+
+html[dir='rtl'] .table-strong,
+html[dir='rtl'] .mono-id {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+html[dir='rtl'] .table-strong {
+  text-align: right;
+}
+
+html[dir='rtl'] .check-cell {
+  padding-right: 12px !important;
+  padding-left: 0 !important;
+}
+
+html[dir='rtl'] .table-person em,
+html[dir='rtl'] .table-muted {
+  text-align: right;
+}
+
+html[dir='rtl'] .table-items {
+  direction: rtl;
+}
+
+html[dir='rtl'] .data-table th {
+  text-align: right;
+}
+
+html[dir='rtl'] .table-foot-sum {
+  unicode-bidi: isolate;
+}
+
+html[dir='rtl'] .board-head .board-hint,
+html[dir='rtl'] .board-customer span,
+html[dir='rtl'] .product-meta .ghost-action,
+html[dir='rtl'] .detail-person .pill,
+html[dir='rtl'] .settings-chev,
+html[dir='rtl'] .chat-head-actions,
+html[dir='rtl'] .thread-unread,
+html[dir='rtl'] .app-title .pill {
+  margin-left: 0;
+  margin-inline-start: auto;
+}
+
+html[dir='rtl'] .board-card,
+html[dir='rtl'] .board-customer,
+html[dir='rtl'] .low-row,
+html[dir='rtl'] .queue-row {
+  text-align: start;
+}
+
+html[dir='rtl'] .board-card-foot {
+  direction: rtl;
+}
+
+html[dir='rtl'] .customer-hero .pill {
+  margin-left: 0;
+  margin-inline-start: auto;
+}
+
+html[dir='rtl'] .detail-rows dd {
+  text-align: left;
+}
+
+html[dir='rtl'] .campaign-stats strong {
+  text-align: left;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+html[dir='rtl'] .discount-code,
+html[dir='rtl'] .mono-id,
+html[dir='rtl'] .webhook-block code,
+html[dir='rtl'] code,
+html[dir='rtl'] input[type='email'],
+html[dir='rtl'] input[type='url'] {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+html[dir='rtl'] input[type='number'] {
+  direction: ltr;
+  text-align: right;
+}
+
+html[dir='rtl'] .discount-code {
+  justify-content: flex-start;
+}
+
+html[dir='rtl'] .app-tag,
+html[dir='rtl'] .kbd {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* ---------- drawers ---------- */
+html[dir='rtl'] .drawer {
+  border-radius: 0 22px 22px 0;
+  box-shadow: 30px 0 80px rgba(0, 0, 0, 0.36);
+  animation-name: drawer-in-rtl;
+}
+
+@keyframes drawer-in-rtl {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- products ---------- */
+html[dir='rtl'] .product-collection {
+  left: auto;
+  right: 8px;
+}
+
+html[dir='rtl'] .product-stock {
+  right: auto;
+  left: 8px;
+}
+
+html[dir='rtl'] .product-title-row h3,
+html[dir='rtl'] .product-title-row p,
+html[dir='rtl'] .low-copy strong {
+  text-align: start;
+}
+
+/* ---------- charts ---------- */
+html[dir='rtl'] .chart-tip {
+  direction: rtl;
+}
+
+html[dir='rtl'] .chart-axis {
+  direction: ltr;
+}
+
+/* ---------- chat ---------- */
+html[dir='rtl'] .chat-list-panel {
+  border-right: 0;
+  border-inline-end: 1px solid var(--line);
+}
+
+html[dir='rtl'] .chat-info {
+  border-left: 0;
+  border-inline-start: 1px solid var(--line);
+}
+
+html[dir='rtl'] .bubble {
+  border-radius: 12px 12px 4px 12px;
+}
+
+html[dir='rtl'] .bubble-me {
+  border-radius: 12px 12px 12px 4px;
+}
+
+html[dir='rtl'] .chat-back .icon,
+html[dir='rtl'] .palette-go,
+html[dir='rtl'] .row-action .icon,
+html[dir='rtl'] .settings-chev,
+html[dir='rtl'] .side-user-out {
+  transform: scaleX(-1);
+}
+
+html[dir='rtl'] .bubble p {
+  line-height: 1.7;
+}
+
+html[dir='rtl'] .chat-composer input {
+  text-align: start;
+}
+
+/* ---------- email ---------- */
+html[dir='rtl'] .email-list-panel {
+  border-right: 0;
+  border-inline-end: 1px solid var(--line);
+}
+
+html[dir='rtl'] .email-body p {
+  line-height: 1.95;
+}
+
+html[dir='rtl'] .email-row,
+html[dir='rtl'] .thread {
+  text-align: start;
+}
+
+html[dir='rtl'] .reply-head,
+html[dir='rtl'] .email-reader-tags {
+  direction: rtl;
+}
+
+/* ---------- settings & help ---------- */
+html[dir='rtl'] .theme-check {
+  right: auto;
+  left: 12px;
+}
+
+html[dir='rtl'] .topic-go {
+  right: auto;
+  left: 12px;
+}
+
+html[dir='rtl'] .theme-preview .tp-side {
+  left: auto;
+  right: 0;
+  border-right: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+html[dir='rtl'] .theme-preview .tp-main {
+  right: auto;
+  left: 0;
+}
+
+html[dir='rtl'] .theme-preview-light .tp-side {
+  border-left-color: rgba(15, 28, 46, 0.06);
+}
+
+html[dir='rtl'] .faq-a p,
+html[dir='rtl'] .topic-card > span,
+html[dir='rtl'] .app-desc,
+html[dir='rtl'] .muted-note {
+  line-height: 1.75;
+}
+
+html[dir='rtl'] .settings-nav-note p {
+  line-height: 1.7;
+}
+
+/* ---------- Arabic type scale ---------- */
+html[dir='rtl'] .brand-name {
+  font-size: 17px;
+}
+
+html[dir='rtl'] .brand-store {
+  font-size: 11.2px;
+}
+
+html[dir='rtl'] .nav-group-label {
+  font-size: 10px;
+  color: var(--faint);
+}
+
+html[dir='rtl'] .nav-item {
+  font-size: 13.2px;
+}
+
+html[dir='rtl'] .side-search {
+  font-size: 12.5px;
+}
+
+html[dir='rtl'] .theme-row {
+  font-size: 12.8px;
+}
+
+html[dir='rtl'] .side-user-copy strong {
+  font-size: 12.2px;
+}
+
+html[dir='rtl'] .side-user-copy span {
+  font-size: 9.8px;
+}
+
+html[dir='rtl'] .page-greeting {
+  font-size: 21px;
+}
+
+html[dir='rtl'] .page-sub {
+  font-size: 11.5px;
+}
+
+html[dir='rtl'] .card-title {
+  font-size: 14.8px;
+}
+
+html[dir='rtl'] .card-sub {
+  font-size: 11.6px;
+  line-height: 1.45;
+}
+
+html[dir='rtl'] .stat-label {
+  font-size: 11.4px;
+}
+
+html[dir='rtl'] .stat-value {
+  font-size: clamp(25px, 2.3vw, 31px);
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: right;
+}
+
+html[dir='rtl'] .stat-foot {
+  font-size: 10.5px;
+}
+
+html[dir='rtl'] .stat-spark {
+  direction: ltr;
+}
+
+html[dir='rtl'] .goal-rows dt {
+  font-size: 10.6px;
+}
+
+html[dir='rtl'] .goal-rows dd {
+  font-size: 11.2px;
+}
+
+html[dir='rtl'] .goal-of {
+  font-size: 9.3px;
+}
+
+html[dir='rtl'] .mini-rows dt,
+html[dir='rtl'] .mini-rows dd {
+  font-size: 10.8px;
+}
+
+html[dir='rtl'] .queue-copy strong {
+  font-size: 12px;
+}
+
+html[dir='rtl'] .queue-copy span {
+  font-size: 9.8px;
+}
+
+html[dir='rtl'] .queue-total {
+  font-size: 11.2px;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+html[dir='rtl'] .low-copy strong {
+  font-size: 11.6px;
+}
+
+html[dir='rtl'] .low-copy span {
+  font-size: 9.6px;
+}
+
+html[dir='rtl'] .source-list li {
+  font-size: 10.8px;
+}
+
+html[dir='rtl'] .source-value {
+  font-size: 10.8px;
+}
+
+html[dir='rtl'] .source-share {
+  font-size: 10px;
+}
+
+html[dir='rtl'] .chart-axis {
+  font-size: 9.5px;
+}
+
+html[dir='rtl'] .table-foot {
+  font-size: 10.6px;
+}
+
+html[dir='rtl'] .tab {
+  font-size: 12px;
+}
+
+html[dir='rtl'] .tab-count {
+  font-size: 9.4px;
+}
+
+html[dir='rtl'] .chip {
+  font-size: 11px;
+}
+
+html[dir='rtl'] .btn {
+  font-size: 12.4px;
+}
+
+html[dir='rtl'] .ghost-action {
+  font-size: 10.8px;
+}
+
+html[dir='rtl'] .tiny-link {
+  font-size: 10.8px;
+}
+
+html[dir='rtl'] .mini-stat span:not(.mini-stat-icon) {
+  font-size: 10.2px;
+}
+
+html[dir='rtl'] .mini-stat strong {
+  font-size: 17px;
+}
+
+html[dir='rtl'] .pill {
+  font-size: 10.2px;
+}
+
+html[dir='rtl'] .data-table th {
+  font-size: 9.6px;
+}
+
+html[dir='rtl'] .data-table td {
+  font-size: 11.8px;
+}
+
+html[dir='rtl'] .table-person strong {
+  font-size: 11.8px;
+}
+
+html[dir='rtl'] .table-person em {
+  font-size: 9.6px;
+}
+
+html[dir='rtl'] .table-muted,
+html[dir='rtl'] .table-items {
+  font-size: 10.8px;
+}
+
+html[dir='rtl'] .search-box input,
+html[dir='rtl'] .select-sm {
+  font-size: 11.6px;
+}
+
+html[dir='rtl'] .field-label {
+  font-size: 11.2px;
+}
+
+html[dir='rtl'] .field-hint {
+  font-size: 10.2px;
+}
+
+html[dir='rtl'] .modal-head .card-sub {
+  font-size: 11.2px;
+}
+
+html[dir='rtl'] .product-title-row h3 {
+  font-size: 12.2px;
+}
+
+html[dir='rtl'] .product-title-row p {
+  font-size: 9.4px;
+}
+
+html[dir='rtl'] .product-price {
+  font-size: 12px;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+html[dir='rtl'] .product-meta {
+  font-size: 9.4px;
+}
+
+html[dir='rtl'] .product-stock,
+html[dir='rtl'] .product-collection {
+  font-size: 8px;
+}
+
+html[dir='rtl'] .board-head strong {
+  font-size: 11px;
+}
+
+html[dir='rtl'] .board-hint {
+  font-size: 8.4px;
+}
+
+html[dir='rtl'] .board-customer strong {
+  font-size: 11px;
+}
+
+html[dir='rtl'] .board-items {
+  font-size: 9.2px;
+}
+
+html[dir='rtl'] .thread-copy > p {
+  font-size: 10.2px;
+}
+
+html[dir='rtl'] .thread-top strong {
+  font-size: 11.4px;
+}
+
+html[dir='rtl'] .bubble p {
+  font-size: 11.8px;
+}
+
+html[dir='rtl'] .chat-head-copy strong {
+  font-size: 12px;
+}
+
+html[dir='rtl'] .chat-head-copy span,
+html[dir='rtl'] .chat-info-hero > span {
+  font-size: 9.6px;
+}
+
+html[dir='rtl'] .email-body p {
+  font-size: 11.8px;
+}
+
+html[dir='rtl'] .email-subject {
+  font-size: 10.6px;
+}
+
+html[dir='rtl'] .email-preview {
+  font-size: 9.4px;
+}
+
+html[dir='rtl'] .email-reader-title h2 {
+  font-size: 18.5px;
+}
+
+html[dir='rtl'] .faq-q {
+  font-size: 11.8px;
+  line-height: 1.6;
+}
+
+html[dir='rtl'] .faq-a p {
+  font-size: 11px;
+}
+
+html[dir='rtl'] .help-mini p,
+html[dir='rtl'] .ticket-success p {
+  font-size: 10.6px;
+}
+
+html[dir='rtl'] .app-title strong {
+  font-size: 11.8px;
+}
+
+html[dir='rtl'] .app-desc {
+  font-size: 10.2px;
+}
+
+html[dir='rtl'] .app-sync {
+  font-size: 9px;
+}
+
+html[dir='rtl'] .settings-tab {
+  font-size: 11.6px;
+}
+
+html[dir='rtl'] .setting-row strong,
+html[dir='rtl'] .data-row strong,
+html[dir='rtl'] .danger-row strong {
+  font-size: 11.4px;
+}
+
+html[dir='rtl'] .setting-row span,
+html[dir='rtl'] .data-row span,
+html[dir='rtl'] .danger-row span {
+  font-size: 10px;
+}
+
+html[dir='rtl'] .campaign-copy strong {
+  font-size: 11.4px;
+}
+
+html[dir='rtl'] .discount-campaign {
+  font-size: 9.4px;
+}
+
+html[dir='rtl'] .invoice-lines > div {
+  font-size: 10.8px;
+}
+
+html[dir='rtl'] .detail-rows dt {
+  font-size: 10.6px;
+}
+
+html[dir='rtl'] .detail-rows dd {
+  font-size: 11.2px;
+}
+
+html[dir='rtl'] .detail-note p,
+html[dir='rtl'] .muted-note {
+  font-size: 10.4px;
+  line-height: 1.7;
+}
+
+html[dir='rtl'] .app-footer {
+  font-size: 10.5px;
+}
+
+/* ---------- responsive mirrors ---------- */
+@media (max-width: 1280px) {
+  html[dir='rtl'] .stat-spark {
+    padding: 0 0 0 10px;
+  }
+}
+
+@media (max-width: 1080px) {
+  html[dir='rtl'] .main-wrap {
+    margin-right: 0;
+  }
+
+  html[dir='rtl'] .sidebar {
+    transform: translateX(105%);
+    border-radius: 26px 0 0 26px;
+  }
+
+  html[dir='rtl'] .sidebar.is-mobile-open {
+    transform: none;
+  }
+
+  html[dir='rtl'] .sidebar.is-collapsed {
+    transform: translateX(105%);
+  }
+
+  html[dir='rtl'] .sidebar.is-collapsed.is-mobile-open {
+    transform: none;
+  }
+}
+
+@media (max-width: 720px) {
+  html[dir='rtl'] .toasts {
+    left: 14px;
+    right: 14px;
+    align-items: stretch;
+  }
+
+  html[dir='rtl'] .bell-pop {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 68px);
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+  }
+}
+
+@media (max-width: 640px) {
+  html[dir='rtl'] .stat-cell:nth-child(2) {
+    border-inline-start: 1px solid var(--line);
+  }
+
+  html[dir='rtl'] .stat-cell:nth-child(3) {
+    border-inline-start: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  html[dir='rtl'] .stat-spark {
+    border-inline-start: 1px solid var(--line);
+    border-top: 1px solid var(--line);
+    padding: 0 15px;
+  }
+}
+
+@media (max-width: 560px) {
+  html[dir='rtl'] .campaign-row {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  html[dir='rtl'] .campaign-row > .pill {
+    grid-column: 2;
+  }
+}
